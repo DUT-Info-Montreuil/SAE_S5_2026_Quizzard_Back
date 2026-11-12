@@ -1,0 +1,18 @@
+# Base PostgreSQL de développement, démarrée automatiquement par Spring Boot
+# (spring-boot-docker-compose) au lancement de l'application.
+# Valeurs modifiables dans un fichier .env (voir .env.example) ; identifiants de développement uniquement.
+services:
+  postgres:
+    image: 'postgres:18'
+    environment:
+      - 'POSTGRES_DB=${DB_NAME:-quizzard}'
+      - 'POSTGRES_USER=${DB_USER:-quizzard}'
+      - 'POSTGRES_PASSWORD=${DB_PASSWORD:-quizzard}'
+    # 5433 côté machine : le 5432 est souvent pris par un PostgreSQL installé sur le poste.
+    ports:
+      - '${DB_PORT:-5433}:5432'
+    volumes:
+      - 'quizzard-donnees:/var/lib/postgresql'
+
+volumes:
+  quizzard-donnees:
