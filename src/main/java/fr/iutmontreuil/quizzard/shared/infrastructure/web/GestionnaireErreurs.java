@@ -52,6 +52,7 @@ public class GestionnaireErreurs extends ResponseEntityExceptionHandler {
     static final String MESSAGE_500 = "Une erreur est survenue. Réessayez dans un instant.";
     static final String MESSAGE_401 = "Vous devez être connecté.";
     static final String MESSAGE_403 = "Action non autorisée.";
+    static final String CODE_REQUETE_INVALIDE = "REQUETE_INVALIDE";
 
     private static final Logger journal = LoggerFactory.getLogger("http");
 
@@ -80,7 +81,11 @@ public class GestionnaireErreurs extends ResponseEntityExceptionHandler {
         return reponse(statut, ReponseErreur.de(e.getMessage(), champs, e.code()));
     }
 
-    /** DTO invalide ({@code @Valid}) : un message par champ, sans recopier les valeurs reçues dans les logs. */
+    /**
+     * DTO invalide ({@code @Valid}) : 400 REQUETE_INVALIDE (dossier de conception, tableaux des cas d'erreur des UC),
+     * un message par champ, sans recopier les valeurs reçues dans les logs. Une règle métier qui refuse des données
+     * bien formées reste en 422 ({@code ExceptionDonneesInvalides}).
+     */
     @Override
     protected ResponseEntity<Object> handleMethodArgumentNotValid(MethodArgumentNotValidException e,
                                                                   HttpHeaders entetes, HttpStatusCode statut,
@@ -89,7 +94,8 @@ public class GestionnaireErreurs extends ResponseEntityExceptionHandler {
         e.getBindingResult().getFieldErrors().forEach(erreur -> champs.putIfAbsent(erreur.getField(),
                 erreur.isBindingFailure() ? "Cette valeur n'est pas valide." : erreur.getDefaultMessage()));
         ranger(requete, e, "champs invalides : " + String.join(", ", champs.keySet()));
-        return reponse(HttpStatus.UNPROCESSABLE_ENTITY, ReponseErreur.de("Certaines valeurs sont invalides.", champs));
+        return reponse(HttpStatus.BAD_REQUEST,
+                ReponseErreur.de("Certaines valeurs sont invalides.", champs, CODE_REQUETE_INVALIDE));
     }
 
     /** Refus levé dans un contrôleur ({@code @PreAuthorize}) : 401 pour un visiteur, 403 pour un connecté. */

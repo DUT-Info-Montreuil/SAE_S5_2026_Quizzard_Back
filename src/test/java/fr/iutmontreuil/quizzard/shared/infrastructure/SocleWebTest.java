@@ -96,11 +96,12 @@ class SocleWebTest {
 
     @Test
     @WithMockUser
-    void un_dto_invalide_renvoie_422_avec_un_message_par_champ() throws Exception {
+    void un_dto_invalide_renvoie_400_requete_invalide_avec_un_message_par_champ() throws Exception {
         mvc.perform(post("/test/valider").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"titre\": \"\"}"))
-                .andExpect(status().isUnprocessableContent())
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("REQUETE_INVALIDE"))
                 .andExpect(jsonPath("$.champs.titre").exists());
     }
 
