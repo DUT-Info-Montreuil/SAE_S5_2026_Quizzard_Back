@@ -36,7 +36,7 @@ class SeanceMapper {
         return new EtatSeanceResponse(versResponse(etat.question()), etat.dejaRepondu(), etat.scoreTotal());
     }
 
-    private QuestionResponse versResponse(QuestionPourEtudiant q) {
+    QuestionResponse versResponse(QuestionPourEtudiant q) {
         if (q == null) {
             return null;
         }
@@ -54,7 +54,7 @@ class SeanceMapper {
         return choix.stream().map(c -> new ElementResponse(c.id(), c.libelle())).toList();
     }
 
-    private OffsetDateTime avecDecalage(LocalDateTime date) {
+    OffsetDateTime avecDecalage(LocalDateTime date) {
         return date == null ? null : date.atZone(horloge.getZone()).toOffsetDateTime();
     }
 }

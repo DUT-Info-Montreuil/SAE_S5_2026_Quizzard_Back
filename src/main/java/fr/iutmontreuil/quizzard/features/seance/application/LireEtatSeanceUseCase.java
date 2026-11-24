@@ -56,7 +56,7 @@ public class LireEtatSeanceUseCase {
     }
 
     /** Vue sans réponses attendues : seuls l'énoncé et les libellés sortent du serveur. */
-    static QuestionPourEtudiant pourEtudiant(Question question, SessionQuiz session) {
+    public static QuestionPourEtudiant pourEtudiant(Question question, SessionQuiz session) {
         List<Choix> propositions = List.of();
         boolean choixMultiple = false;
         List<Choix> gauche = List.of();
