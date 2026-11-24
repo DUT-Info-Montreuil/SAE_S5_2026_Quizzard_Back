@@ -66,10 +66,10 @@ public class GestionnaireErreurs extends ResponseEntityExceptionHandler {
             default -> HttpStatus.UNPROCESSABLE_ENTITY;
         };
         ranger(requete, e, e.getMessage());
-        if (e instanceof ExceptionDonneesInvalides invalide && invalide.champ() != null) {
-            return reponse(statut, ReponseErreur.de(e.getMessage(), Map.of(invalide.champ(), e.getMessage())));
-        }
-        return reponse(statut, ReponseErreur.de(e.getMessage()));
+        Map<String, String> champs = e instanceof ExceptionDonneesInvalides invalide && invalide.champ() != null
+                ? Map.of(invalide.champ(), e.getMessage())
+                : null;
+        return reponse(statut, ReponseErreur.de(e.getMessage(), champs, e.code()));
     }
 
     /** DTO invalide ({@code @Valid}) : un message par champ, sans recopier les valeurs reçues dans les logs. */
