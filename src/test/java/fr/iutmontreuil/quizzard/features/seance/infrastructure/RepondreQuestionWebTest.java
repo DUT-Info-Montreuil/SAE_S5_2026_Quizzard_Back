@@ -161,6 +161,14 @@ class RepondreQuestionWebTest {
     }
 
     @Test
+    void une_reponse_sans_question_est_refusee_avec_requete_invalide() throws Exception {
+        repondre("{\"idPropositions\": [1000]}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("REQUETE_INVALIDE"))
+                .andExpect(jsonPath("$.champs.idQuestion").exists());
+    }
+
+    @Test
     void relier_enregistre_les_liens_et_accorde_les_points_partiels() throws Exception {
         ouvrir(2, LocalDateTime.now(horloge).plusSeconds(30));
         repondre("""

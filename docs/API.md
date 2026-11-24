@@ -207,7 +207,7 @@ Le temps de réponse est **mesuré par le serveur** ; aucun horodatage envoyé p
 | Réponse après l'échéance (horloge du serveur) | `409` | `HORS_DELAI` | Temps écoulé : réponse non prise en compte. |
 | Réponse déjà enregistrée | `409` | `DEJA_REPONDU` | Tu as déjà répondu. |
 | Contenu incohérent avec la question | `422` | `REPONSE_INVALIDE` | Réponse incomplète, vérifie ta saisie. |
-| `idQuestion` absent | `422` | — | Certaines valeurs sont invalides. (`champs.idQuestion`) |
+| `idQuestion` absent | `400` | `REQUETE_INVALIDE` | Certaines valeurs sont invalides. (`champs.idQuestion`) |
 | Corps illisible | `400` | — | La requête est mal formée. |
 | Erreur de base de données (rien n'est enregistré) | `500` | — | Message générique |
 
