@@ -115,10 +115,49 @@ la ressource), « Étu. » = étudiant avec jeton de participant, « Admin » = 
 | `POST` | `/api/cours/{idCours}/versions` | Ens. | M | Nouvelle version du PDF (multipart) → `201` version + pages proposées (`valide = false`) |
 | `GET` | `/api/cours/{idCours}/versions/{idVersion}/fichier` | Ens. ou Étu. de la séance | M | Le PDF (`application/pdf`), jamais servi en accès direct |
 | `GET` | `/api/cours/{idCours}/versions/{idVersion}/pages` | Ens. | M | Pages insérées de la version, dans l'ordre |
-| `POST` | `/api/cours/{idCours}/versions/{idVersion}/pages` | Ens. | M | Insérer une page `{numeroPage, ordre, idQuestion | idClassement}` → `201` |
+| `POST` | `/api/cours/{idCours}/pages-quiz` | Ens. | M | **Fait (UC3).** Insérer une page de quiz (voir ci-dessous) → `201` |
+| `POST` | `/api/cours/{idCours}/versions/{idVersion}/pages` | Ens. | M | Insérer une page de classement `{numeroPage, ordre, idClassement}` (UC11) → `201` |
 | `PATCH` | `/api/pages/{idPage}` | Ens. | M | Déplacer une page `{numeroPage, ordre}` |
 | `DELETE` | `/api/pages/{idPage}` | Ens. | M | Retirer une page (la question n'est pas supprimée) → `204` |
 | `POST` | `/api/cours/{idCours}/versions/{idVersion}/pages/validation` | Ens. | M | Valider les positions proposées après réapplication (UC6) |
+
+**Insérer une page de quiz (UC3).** Route du dossier de conception. Enseignant connecté et propriétaire du cours,
+lu dans la session (jamais dans la requête) ; un cours d'un autre enseignant répond comme un cours inexistant.
+
+```json
+{ "idVersion": 7, "numeroPage": 4, "ordre": 0, "idQuiz": 3, "repereTexte": "…fin de la page 4" }
+```
+
+- `numeroPage` : page du PDF après laquelle la page s'insère (0 = avant la première, `nbPages` = après la
+  dernière) ; `ordre` : rang parmi les pages déjà insérées au même endroit (0 = juste après la page du PDF). Les
+  pages de rang supérieur ou égal au même endroit sont décalées de 1.
+- `idQuiz` absent : un nouveau quiz est créé (« Quiz n », non noté, 20 s, passage manuel, cours projeté seul).
+  Dans tous les cas une question vierge est ajoutée (QCM, énoncé vide, durée du quiz, 1000 points, décroissance,
+  sans points partiels).
+- `repereTexte` : 300 caractères au plus, espaces normalisés (sert à l'UC6).
+
+Réponse `201`, en-tête `Location: /api/cours/{idCours}/pages/{idPage}` :
+
+```json
+{
+  "idPage": 12, "idQuiz": 3, "titreQuiz": "Quiz 1", "quizCree": false, "idQuestion": 40,
+  "numeroPage": 4, "ordre": 0,
+  "pages": [ { "idPage": 9, "numeroPage": 2, "ordre": 0, "type": "QUIZ" },
+             { "idPage": 12, "numeroPage": 4, "ordre": 0, "type": "QUIZ" } ]
+}
+```
+
+| Cas (UC3) | Statut | `code` | `error` |
+|---|---|---|---|
+| Pas connecté | `401` | — | Vous devez être connecté. |
+| Corps incomplet, valeur négative, repère trop long | `400` | `REQUETE_INVALIDE` | Certaines valeurs sont invalides. (`champs`) |
+| Cours inexistant ou d'un autre enseignant | `404` | `COURS_INTROUVABLE` | Cours introuvable. |
+| Cours archivé | `409` | `COURS_ARCHIVE` | Ce cours est archivé : il n'est plus modifiable. |
+| Version qui n'est plus la dernière | `409` | `VERSION_PERIMEE` | Une nouvelle version du cours a été importée : rechargez l'éditeur. |
+| Emplacement hors du cours | `422` | `EMPLACEMENT_INVALIDE` | Emplacement invalide : rechargez l'éditeur. |
+| Quiz inexistant, archivé ou d'un autre cours | `404` | `QUIZ_INTROUVABLE` | Quiz introuvable. |
+| Quiz en cours de séance | `409` | `QUIZ_EN_SEANCE` | Ce quiz est en cours de séance : réessayez après sa clôture. |
+| Erreur de base de données (rien n'est créé) | `500` | — | Message générique |
 
 ### 3.3 Quiz et questions (`quiz`) : UC4, UC5, UC13, UC14
 

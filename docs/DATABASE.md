@@ -5,7 +5,9 @@ Le back-end utilise **PostgreSQL 18**. Le schéma est créé et versionné **uni
 (`spring.jpa.hibernate.ddl-auto=validate`).
 
 Source du schéma : dossier de conception et d'architecture technique, §3.2 (MLD, 20 tables) et §3.2.3 (dictionnaire
-des données). Migration actuelle : [`V1__schema_initial.sql`](../src/main/resources/db/migration/V1__schema_initial.sql).
+des données). Migrations : [`V1__schema_initial.sql`](../src/main/resources/db/migration/V1__schema_initial.sql),
+[`V2__page_inseree_position_differee.sql`](../src/main/resources/db/migration/V2__page_inseree_position_differee.sql)
+(UC3 : contrainte de position des pages vérifiée en fin de transaction).
 
 ---
 
@@ -102,7 +104,7 @@ erDiagram
 
 | Table | Rôle | Points clés |
 |---|---|---|
-| `page_inseree` | Page de quiz ou de classement intercalée dans une version du cours | Ancrée par `numero_page` (0 = avant la première page) + `repere_texte` + `ordre` (plusieurs pages au même endroit) ; **soit** `id_question` **soit** `id_classement` (`num_nonnulls = 1`) ; une question n'apparaît qu'une fois par version ; `valide` = position confirmée par l'enseignant après réapplication (UC6). |
+| `page_inseree` | Page de quiz ou de classement intercalée dans une version du cours | Ancrée par `numero_page` (0 = avant la première page) + `repere_texte` + `ordre` (plusieurs pages au même endroit) ; **soit** `id_question` **soit** `id_classement` (`num_nonnulls = 1`) ; une question n'apparaît qu'une fois par version ; `uq_page_inseree_position` est `DEFERRABLE INITIALLY DEFERRED` (V2), pour décaler les rangs (`ordre = ordre + 1`) dans la transaction d'insertion (UC3) ; `valide` = position confirmée par l'enseignant après réapplication (UC6). |
 
 ### 4.4 Séances et résultats
 
