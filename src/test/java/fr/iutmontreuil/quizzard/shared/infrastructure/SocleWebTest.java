@@ -27,6 +27,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import fr.iutmontreuil.quizzard.TestcontainersConfiguration;
@@ -112,6 +113,34 @@ class SocleWebTest {
     }
 
     @Test
+    void une_exception_qui_porte_un_code_le_renvoie_au_client() throws Exception {
+        mvc.perform(post("/api/public/test/code"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("Tu as déjà répondu."))
+                .andExpect(jsonPath("$.code").value("DEJA_REPONDU"));
+    }
+
+    @Test
+    @WithMockUser
+    void une_exception_sans_code_n_ecrit_pas_le_champ_code() throws Exception {
+        mvc.perform(get("/test/conflit"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").doesNotExist());
+    }
+
+    @Test
+    void une_route_publique_repond_sans_connexion_ni_jeton_csrf() throws Exception {
+        mvc.perform(post("/api/public/test/ouverte"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void l_en_tete_date_est_lisible_par_le_front() throws Exception {
+        mvc.perform(get("/api/public/test/ouverte").header("Origin", "http://localhost:5173"))
+                .andExpect(header().string("Access-Control-Expose-Headers", containsString("Date")));
+    }
+
+    @Test
     void le_front_react_passe_le_cors() throws Exception {
         mvc.perform(options("/test/introuvable")
                         .header("Origin", "http://localhost:5173")
@@ -165,6 +194,17 @@ class SocleWebTest {
         }
     }
 
+    static class DejaRepondu extends ExceptionConflit {
+        DejaRepondu() {
+            super("Tu as déjà répondu.");
+        }
+
+        @Override
+        public String code() {
+            return "DEJA_REPONDU";
+        }
+    }
+
     record RequeteTest(@NotBlank String titre) {
     }
 
@@ -199,6 +239,15 @@ class SocleWebTest {
 
         @PostMapping("/test/valider")
         void valider(@Valid @RequestBody RequeteTest requete) {
+        }
+
+        @RequestMapping("/api/public/test/ouverte")
+        void ouverte() {
+        }
+
+        @PostMapping("/api/public/test/code")
+        void code() {
+            throw new DejaRepondu();
         }
     }
 }

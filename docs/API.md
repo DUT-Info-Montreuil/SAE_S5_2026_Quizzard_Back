@@ -21,6 +21,7 @@ Contrat entre le back-end Spring Boot et le front React : routes REST et canal t
 | Identifiants | Entiers (`id*`) ; les séances sont aussi désignées par leur `codeAcces` dans les routes publiques |
 | Pagination | Inutile aux volumes prévus ; si besoin plus tard : `?page=0&taille=50` |
 | Traçabilité | Chaque réponse porte l'en-tête `X-Request-Id`, exposé au front par CORS |
+| Heure du serveur | En-tête `Date` de chaque réponse, exposé au front par CORS (calage du décompte, §4) |
 
 ### Authentification
 
@@ -29,6 +30,7 @@ Contrat entre le back-end Spring Boot et le front React : routes REST et canal t
   toute requête qui modifie des données (`POST`, `PUT`, `PATCH`, `DELETE`).
 - **Étudiant** : routes `/api/public/**`. Après avoir rejoint une séance, l'étudiant reçoit un **jeton de
   participant** à renvoyer dans l'en-tête `X-Jeton-Participant`. Le jeton n'est valable que pour cette séance.
+  Ces routes sont ouvertes sans session et hors CSRF : le contrôle d'accès repose sur ce jeton.
 - Développement : `SECURITE_OUVERTE=true` dans `.env` ouvre toutes les routes et coupe le CSRF (jamais sur le serveur).
 
 ### Codes de statut
@@ -66,6 +68,17 @@ Une erreur de validation (422) ajoute `champs`, un message par champ fautif :
   "error": "Certaines valeurs sont invalides.",
   "request_id": "…",
   "champs": { "titre": "Le titre est obligatoire." }
+}
+```
+
+Une erreur métier qui a un code stable l'ajoute dans `code`, en majuscules. Le front s'en sert quand le statut ne
+suffit pas à choisir le message (plusieurs causes de 409, par exemple). Sans code, le champ est absent :
+
+```json
+{
+  "error": "Tu as déjà répondu.",
+  "request_id": "…",
+  "code": "DEJA_REPONDU"
 }
 ```
 
