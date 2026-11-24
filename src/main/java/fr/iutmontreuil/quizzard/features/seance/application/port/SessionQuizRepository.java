@@ -12,4 +12,7 @@ public interface SessionQuizRepository {
      * dans la version du cours projetée (pages triées par page du PDF puis par ordre).
      */
     Optional<SessionQuiz> trouverParCodeAcces(String codeAcces);
+
+    /** Même lecture, par identifiant de séance. */
+    Optional<SessionQuiz> trouverParId(Long idSession);
 }

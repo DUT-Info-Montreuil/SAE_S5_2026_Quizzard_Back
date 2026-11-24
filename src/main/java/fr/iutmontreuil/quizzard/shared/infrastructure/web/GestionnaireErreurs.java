@@ -55,9 +55,12 @@ public class GestionnaireErreurs extends ResponseEntityExceptionHandler {
 
     private static final Logger journal = LoggerFactory.getLogger("http");
 
-    @ExceptionHandler(ExceptionMetier.class)
-    ResponseEntity<Object> exceptionMetier(ExceptionMetier e, WebRequest requete) {
-        HttpStatus statut = switch (e) {
+    /**
+     * Statut HTTP de chaque catégorie d'exception métier. Seule correspondance du projet : le canal temps réel
+     * ({@link GestionnaireErreursTempsReel}) la réutilise pour envoyer le même statut à l'étudiant.
+     */
+    static HttpStatus statutDe(ExceptionMetier e) {
+        return switch (e) {
             case ExceptionIntrouvable _ -> HttpStatus.NOT_FOUND;
             case ExceptionConflit _ -> HttpStatus.CONFLICT;
             case ExceptionAccesRefuse _ -> HttpStatus.FORBIDDEN;
@@ -65,6 +68,11 @@ public class GestionnaireErreurs extends ResponseEntityExceptionHandler {
             case ExceptionTypeNonSupporte _ -> HttpStatus.UNSUPPORTED_MEDIA_TYPE;
             default -> HttpStatus.UNPROCESSABLE_ENTITY;
         };
+    }
+
+    @ExceptionHandler(ExceptionMetier.class)
+    ResponseEntity<Object> exceptionMetier(ExceptionMetier e, WebRequest requete) {
+        HttpStatus statut = statutDe(e);
         ranger(requete, e, e.getMessage());
         Map<String, String> champs = e instanceof ExceptionDonneesInvalides invalide && invalide.champ() != null
                 ? Map.of(invalide.champ(), e.getMessage())

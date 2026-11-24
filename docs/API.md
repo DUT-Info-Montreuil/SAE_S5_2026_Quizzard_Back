@@ -272,6 +272,16 @@ La purge à échéance (3 mois, 12 mois, 6 mois) est une tâche planifiée, sans
 - Le serveur **pousse** ; les commandes passent par l'API REST (§3.4, §3.5).
 - Authentification : cookie de session pour l'enseignant ; en-tête STOMP `X-Jeton-Participant` dans la trame
   `CONNECT` pour l'étudiant. Un abonnement à une séance d'un autre enseignant est refusé.
+- **Fait (UC9)** : la poignée de main `/ws` est publique, le contrôle se fait dans la trame STOMP.
+  - `CONNECT` avec un jeton inconnu, ou sans jeton hors mode développement (`SECURITE_OUVERTE`) : trame `ERROR`
+    dont l'en-tête `message` vaut `JETON_INVALIDE`. La connexion de l'enseignant arrivera avec la feature `compte`.
+  - Un étudiant ne s'abonne qu'à `/topic/sessions/{sonCode}/etat`, `/question`, `/correction` et à
+    `/user/queue/**` ; tout autre abonnement reçoit une trame `ERROR` `ABONNEMENT_REFUSE`.
+  - Envoi d'une réponse par STOMP (dossier de conception) : `SEND /app/sessions/{idSession}/reponses`, même corps
+    que la route REST plus `requestId`. Accusé `{requestId, idQuestion, horodatageServeur}` sur
+    `/user/queue/reponses`, erreurs `{requestId, code, statut, error}` sur `/user/queue/erreurs` (mêmes codes que
+    §3.5, `REQUETE_INVALIDE` 400 pour un message mal formé). Le front actuel répond en REST : les deux chemins
+    appellent le même cas d'usage.
 
 | Destination | Abonnés | Contenu | Quand |
 |---|---|---|---|
@@ -282,6 +292,8 @@ La purge à échéance (3 mois, 12 mois, 6 mois) est une tâche planifiée, sans
 | `/topic/sessions/{codeAcces}/correction` | Tous | Bonnes réponses, répartition finale | Clôture de la question |
 | `/topic/sessions/{codeAcces}/ecran` | Enseignant | Écran intermédiaire à afficher | Après la clôture, selon la configuration |
 | `/topic/sessions/{codeAcces}/classement` | Enseignant | Classement complet (pseudonymes, scores, évolution) | Après la clôture de chaque question |
+| `/user/queue/reponses` | Un étudiant | `{requestId, idQuestion, horodatageServeur}` | Réponse envoyée par STOMP et enregistrée |
+| `/user/queue/erreurs` | Un étudiant | `{requestId, code, statut, error}` | Message STOMP refusé |
 | `/user/queue/resultat` | Un étudiant | `{points, scoreTotal, rang, nombreParticipants, evolution}` | Après la clôture de chaque question |
 
 Exemple de message `/topic/sessions/{codeAcces}/question` :

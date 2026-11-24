@@ -24,9 +24,7 @@ class PostgresSessionQuizRepository implements SessionQuizRepository {
         this.jdbc = jdbc;
     }
 
-    @Override
-    public Optional<SessionQuiz> trouverParCodeAcces(String codeAcces) {
-        return jdbc.sql("""
+    private static final String SELECT_SEANCE = """
                         SELECT s.id_session, s.code_acces, s.etat, s.est_notee, s.position_courante,
                                s.echeance_question,
                                (SELECT pages.id_question
@@ -37,9 +35,21 @@ class PostgresSessionQuizRepository implements SessionQuizRepository {
                                          WHERE p.id_version = s.id_version AND q.id_quiz = s.id_quiz) pages
                                  WHERE pages.rang = s.position_courante) AS id_question_ouverte
                           FROM session_quiz s
-                         WHERE s.code_acces = :codeAcces
-                        """)
-                .param("codeAcces", codeAcces)
+                        """;
+
+    @Override
+    public Optional<SessionQuiz> trouverParCodeAcces(String codeAcces) {
+        return lire("s.code_acces = :valeur", codeAcces);
+    }
+
+    @Override
+    public Optional<SessionQuiz> trouverParId(Long idSession) {
+        return lire("s.id_session = :valeur", idSession);
+    }
+
+    private Optional<SessionQuiz> lire(String condition, Object valeur) {
+        return jdbc.sql(SELECT_SEANCE + " WHERE " + condition)
+                .param("valeur", valeur)
                 .query((ligne, i) -> {
                     Timestamp echeance = ligne.getTimestamp("echeance_question");
                     return new SessionQuiz(

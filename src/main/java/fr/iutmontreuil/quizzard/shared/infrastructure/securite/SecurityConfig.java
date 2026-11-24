@@ -56,7 +56,9 @@ class SecurityConfig {
                 .authorizeHttpRequests(routes -> {
                     routes.requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**").permitAll()
                             .requestMatchers("/error").permitAll()
-                            .requestMatchers(ROUTES_PUBLIQUES).permitAll();
+                            .requestMatchers(ROUTES_PUBLIQUES).permitAll()
+                            // Poignée de main WebSocket : l'accès est contrôlé dans la trame STOMP CONNECT.
+                            .requestMatchers("/ws", "/ws/**").permitAll();
                     if (ouverte) {
                         routes.anyRequest().permitAll();
                     } else {

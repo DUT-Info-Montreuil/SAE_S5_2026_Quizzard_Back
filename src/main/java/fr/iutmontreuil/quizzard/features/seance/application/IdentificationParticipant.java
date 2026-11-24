@@ -41,4 +41,21 @@ public class IdentificationParticipant {
                 .orElseThrow(ParticipantInvalideException::new);
         return new ParticipantEnSeance(session, participant);
     }
+
+    /**
+     * Participant et séance désignés par le jeton seul : connexion au canal temps réel, où le code d'accès n'est
+     * pas encore connu.
+     *
+     * @throws ParticipantInvalideException si le jeton ne désigne aucun participant
+     */
+    public ParticipantEnSeance identifier(String jeton) {
+        if (jeton == null || jeton.isBlank()) {
+            throw new ParticipantInvalideException();
+        }
+        Participant participant = participants.trouverParEmpreinteJeton(JetonParticipant.empreinte(jeton))
+                .orElseThrow(ParticipantInvalideException::new);
+        SessionQuiz session = sessions.trouverParId(participant.idSession())
+                .orElseThrow(ParticipantInvalideException::new);
+        return new ParticipantEnSeance(session, participant);
+    }
 }

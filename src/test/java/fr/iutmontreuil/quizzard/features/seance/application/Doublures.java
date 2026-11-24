@@ -60,6 +60,11 @@ final class Doublures {
         public Optional<SessionQuiz> trouverParCodeAcces(String codeAcces) {
             return Optional.ofNullable(parCode.get(codeAcces));
         }
+
+        @Override
+        public Optional<SessionQuiz> trouverParId(Long idSession) {
+            return parCode.values().stream().filter(s -> s.idSession().equals(idSession)).findFirst();
+        }
     }
 
     static class Participants implements ParticipantRepository {
