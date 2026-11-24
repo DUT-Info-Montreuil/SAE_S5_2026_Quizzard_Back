@@ -176,18 +176,60 @@ Pour `POINTS_A_RELIER`, `propositions` est remplacé par `paires: [{gauche, droi
 | `POST` | `/api/public/sessions/{codeAcces}/participants` | Public | M | Rejoindre sans compte `{pseudonyme}` → `201` `{idParticipant, jeton, pseudonyme}` ; `409` pseudonyme pris (avec suggestion) |
 | `POST` | `/api/public/sessions/{codeAcces}/participants/ldap` | Public | S | Rejoindre un quiz noté `{identifiant, motDePasse, pseudonyme?}` → `201` ; `401` message générique |
 | `POST` | `/api/public/sessions/{codeAcces}/reconnexion` | Étu. | M | Reprendre après une coupure → état courant + score |
-| `GET` | `/api/public/sessions/{codeAcces}/etat` | Étu. | M | Question en cours **sans réponses attendues**, échéance, score et rang du participant |
-| `POST` | `/api/public/sessions/{codeAcces}/reponses` | Étu. | M | Répondre (voir ci-dessous) → `201` `{pointsProvisoires}` ; `409` hors délai, déjà répondu ou mauvaise question |
+| `GET` | `/api/public/sessions/{codeAcces}/etat` | Étu. | M | **Fait (UC9).** Question ouverte **sans réponses attendues**, déjà répondu, score (voir ci-dessous) ; `401` `JETON_INVALIDE` |
+| `POST` | `/api/public/sessions/{codeAcces}/reponses` | Étu. | M | **Fait (UC9).** Répondre (voir ci-dessous) → `201` `{idQuestion, horodatageServeur}`, sans points ni justesse ; erreurs ci-dessous |
 
-Corps d'une réponse, selon le type :
+Les deux routes de l'UC9 lisent le participant dans l'en-tête `X-Jeton-Participant` et répondent avec
+`Cache-Control: no-store`.
+
+**Répondre.** Corps selon le type de la question (un seul des trois contenus est lu) :
 
 ```json
-{ "idQuestion": 12, "propositions": [41, 43] }
+{ "idQuestion": 12, "idPropositions": [41, 43] }
 { "idQuestion": 13, "liens": [ { "gauche": 7, "droite": 9 } ] }
-{ "idQuestion": 14, "texte": "protocole LDAP" }
+{ "idQuestion": 14, "texteLibre": "protocole LDAP" }
 ```
 
+- `liens` : `gauche` et `droite` sont des identifiants de **paires** (celle dont l'étudiant a choisi l'élément de
+  gauche, celle dont il a choisi l'élément de droite). Un lien est juste quand les deux sont égaux. Chaque élément
+  est relié au plus une fois ; une réponse partielle est acceptée (points partiels si le barème le permet).
+- QCM : plusieurs propositions seulement si `choixMultiple` est vrai.
+- Texte libre : non vide, 1000 caractères au plus.
+
 Le temps de réponse est **mesuré par le serveur** ; aucun horodatage envoyé par le client n'est pris en compte.
+
+| Cas (UC9) | Statut | `code` | `error` |
+|---|---|---|---|
+| Jeton absent, inconnu, remplacé ou d'une autre séance | `401` | `JETON_INVALIDE` | Ta session a expiré, rejoins le quiz à nouveau. |
+| Séance non en cours, ou question qui n'est pas la question ouverte | `409` | `QUESTION_CLOSE` | Cette session est terminée. |
+| Réponse après l'échéance (horloge du serveur) | `409` | `HORS_DELAI` | Temps écoulé : réponse non prise en compte. |
+| Réponse déjà enregistrée | `409` | `DEJA_REPONDU` | Tu as déjà répondu. |
+| Contenu incohérent avec la question | `422` | `REPONSE_INVALIDE` | Réponse incomplète, vérifie ta saisie. |
+| `idQuestion` absent | `422` | — | Certaines valeurs sont invalides. (`champs.idQuestion`) |
+| Corps illisible | `400` | — | La requête est mal formée. |
+| Erreur de base de données (rien n'est enregistré) | `500` | — | Message générique |
+
+**État.** Lu au chargement de E8 et après chaque reconnexion :
+
+```json
+{
+  "question": {
+    "idQuestion": 12, "position": 1, "type": "QCM", "enonce": "…", "dureeSec": 20,
+    "echeance": "2026-11-24T15:05:20+01:00",
+    "propositions": [ { "idProposition": 41, "libelle": "LDAP" } ], "choixMultiple": false
+  },
+  "dejaRepondu": false,
+  "scoreTotal": 0
+}
+```
+
+- `question` vaut `null` s'il n'y a pas de question ouverte.
+- `POINTS_A_RELIER` : `elementsGauche` et `elementsDroite` (`[{id, libelle}]`, `id` = identifiant de la paire),
+  mélangés séparément, dans le même ordre pour tous et à chaque lecture. `REPONSE_LIBRE` : ni propositions ni
+  éléments.
+- **Question ouverte** (hypothèse à confirmer avec l'UC7) : la page de quiz de rang `position_courante` (1 pour la
+  première) de la version projetée, pages triées par page du PDF puis par ordre ; ouverte si la séance est
+  `EN_COURS` et qu'`echeance_question` est fixée.
 
 ### 3.6 Classements (`classement`) : UC10, UC11, UC12
 
@@ -236,7 +278,7 @@ La purge à échéance (3 mois, 12 mois, 6 mois) est une tâche planifiée, sans
 | `/topic/sessions/{codeAcces}/etat` | Tous | `{etat, position, idQuestion, echeance}` | Changement d'état, ouverture d'une question |
 | `/topic/sessions/{codeAcces}/question` | Tous | Énoncé, propositions **sans** `estCorrecte`, durée, échéance | Ouverture d'une question |
 | `/topic/sessions/{codeAcces}/connectes` | Enseignant | `{nombre}` | Entrée ou départ d'un participant |
-| `/topic/sessions/{codeAcces}/repartition` | Enseignant | Nombre de réponses par proposition, total reçu | À chaque réponse (regroupé, au plus 1 envoi toutes les 300 ms) |
+| `/topic/sessions/{codeAcces}/repartition` | Enseignant | **Fait (UC9).** `{idQuestion, total, propositions: [{idProposition, nombre}]}` (`propositions` vide hors QCM) | Après chaque réponse validée (regroupé, au plus 1 envoi toutes les 300 ms) |
 | `/topic/sessions/{codeAcces}/correction` | Tous | Bonnes réponses, répartition finale | Clôture de la question |
 | `/topic/sessions/{codeAcces}/ecran` | Enseignant | Écran intermédiaire à afficher | Après la clôture, selon la configuration |
 | `/topic/sessions/{codeAcces}/classement` | Enseignant | Classement complet (pseudonymes, scores, évolution) | Après la clôture de chaque question |
@@ -252,11 +294,12 @@ Exemple de message `/topic/sessions/{codeAcces}/question` :
   "enonce": "Quel protocole sert à l'annuaire de l'IUT ?",
   "propositions": [ { "idProposition": 41, "libelle": "LDAP" }, { "idProposition": 42, "libelle": "SMTP" } ],
   "dureeSec": 20,
-  "echeance": "2026-11-12T14:05:20"
+  "echeance": "2026-11-12T14:05:20+01:00"
 }
 ```
 
-Le front calcule le temps restant à partir d'`echeance` et de l'heure du serveur (en-tête `Date` d'une réponse
+Les dates (`echeance`, `horodatageServeur`) partent avec leur décalage horaire (`+01:00`), pour que le navigateur
+les lise sans ambiguïté de fuseau. Le front calcule le temps restant à partir d'`echeance` et de l'heure du serveur (en-tête `Date` d'une réponse
 REST), pour ne pas dépendre de l'horloge du téléphone.
 
 ## 5. Documentation interactive
