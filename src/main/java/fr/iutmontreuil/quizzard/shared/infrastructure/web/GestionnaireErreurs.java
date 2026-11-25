@@ -52,12 +52,16 @@ public class GestionnaireErreurs extends ResponseEntityExceptionHandler {
     static final String MESSAGE_500 = "Une erreur est survenue. Réessayez dans un instant.";
     static final String MESSAGE_401 = "Vous devez être connecté.";
     static final String MESSAGE_403 = "Action non autorisée.";
+    static final String CODE_REQUETE_INVALIDE = "REQUETE_INVALIDE";
 
     private static final Logger journal = LoggerFactory.getLogger("http");
 
-    @ExceptionHandler(ExceptionMetier.class)
-    ResponseEntity<Object> exceptionMetier(ExceptionMetier e, WebRequest requete) {
-        HttpStatus statut = switch (e) {
+    /**
+     * Statut HTTP de chaque catégorie d'exception métier. Seule correspondance du projet : le canal temps réel
+     * ({@link GestionnaireErreursTempsReel}) la réutilise pour envoyer le même statut à l'étudiant.
+     */
+    static HttpStatus statutDe(ExceptionMetier e) {
+        return switch (e) {
             case ExceptionIntrouvable _ -> HttpStatus.NOT_FOUND;
             case ExceptionConflit _ -> HttpStatus.CONFLICT;
             case ExceptionAccesRefuse _ -> HttpStatus.FORBIDDEN;
@@ -65,14 +69,23 @@ public class GestionnaireErreurs extends ResponseEntityExceptionHandler {
             case ExceptionTypeNonSupporte _ -> HttpStatus.UNSUPPORTED_MEDIA_TYPE;
             default -> HttpStatus.UNPROCESSABLE_ENTITY;
         };
-        ranger(requete, e, e.getMessage());
-        if (e instanceof ExceptionDonneesInvalides invalide && invalide.champ() != null) {
-            return reponse(statut, ReponseErreur.de(e.getMessage(), Map.of(invalide.champ(), e.getMessage())));
-        }
-        return reponse(statut, ReponseErreur.de(e.getMessage()));
     }
 
-    /** DTO invalide ({@code @Valid}) : un message par champ, sans recopier les valeurs reçues dans les logs. */
+    @ExceptionHandler(ExceptionMetier.class)
+    ResponseEntity<Object> exceptionMetier(ExceptionMetier e, WebRequest requete) {
+        HttpStatus statut = statutDe(e);
+        ranger(requete, e, e.getMessage());
+        Map<String, String> champs = e instanceof ExceptionDonneesInvalides invalide && invalide.champ() != null
+                ? Map.of(invalide.champ(), e.getMessage())
+                : null;
+        return reponse(statut, ReponseErreur.de(e.getMessage(), champs, e.code()));
+    }
+
+    /**
+     * DTO invalide ({@code @Valid}) : 400 REQUETE_INVALIDE (dossier de conception, tableaux des cas d'erreur des UC),
+     * un message par champ, sans recopier les valeurs reçues dans les logs. Une règle métier qui refuse des données
+     * bien formées reste en 422 ({@code ExceptionDonneesInvalides}).
+     */
     @Override
     protected ResponseEntity<Object> handleMethodArgumentNotValid(MethodArgumentNotValidException e,
                                                                   HttpHeaders entetes, HttpStatusCode statut,
@@ -81,7 +94,8 @@ public class GestionnaireErreurs extends ResponseEntityExceptionHandler {
         e.getBindingResult().getFieldErrors().forEach(erreur -> champs.putIfAbsent(erreur.getField(),
                 erreur.isBindingFailure() ? "Cette valeur n'est pas valide." : erreur.getDefaultMessage()));
         ranger(requete, e, "champs invalides : " + String.join(", ", champs.keySet()));
-        return reponse(HttpStatus.UNPROCESSABLE_ENTITY, ReponseErreur.de("Certaines valeurs sont invalides.", champs));
+        return reponse(HttpStatus.BAD_REQUEST,
+                ReponseErreur.de("Certaines valeurs sont invalides.", champs, CODE_REQUETE_INVALIDE));
     }
 
     /** Refus levé dans un contrôleur ({@code @PreAuthorize}) : 401 pour un visiteur, 403 pour un connecté. */
