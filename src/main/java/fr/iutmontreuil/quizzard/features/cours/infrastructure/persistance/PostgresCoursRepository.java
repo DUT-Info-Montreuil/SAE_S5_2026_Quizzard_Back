@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 
 import fr.iutmontreuil.quizzard.features.cours.application.port.CoursRepository;
 import fr.iutmontreuil.quizzard.features.cours.domain.Cours;
+import fr.iutmontreuil.quizzard.features.cours.domain.FichierVersion;
 import fr.iutmontreuil.quizzard.features.cours.domain.VersionCours;
 
 /** Cours en SQL (JdbcClient, comme le journal) : la ligne du cours est verrouillée pour la modification. */
@@ -61,6 +62,14 @@ class PostgresCoursRepository implements CoursRepository {
                         + "AND id_cours = :idCours)")
                 .param("idVersion", idVersion).param("idCours", idCours)
                 .query(Boolean.class).single();
+    }
+
+    @Override
+    public Optional<FichierVersion> fichierDe(Long idVersion, Long idCours) {
+        return jdbc.sql("SELECT chemin_stockage FROM version_cours WHERE id_version = :idVersion AND id_cours = :idCours")
+                .param("idVersion", idVersion).param("idCours", idCours)
+                .query((l, i) -> new FichierVersion(l.getString("chemin_stockage")))
+                .optional();
     }
 
     @Override

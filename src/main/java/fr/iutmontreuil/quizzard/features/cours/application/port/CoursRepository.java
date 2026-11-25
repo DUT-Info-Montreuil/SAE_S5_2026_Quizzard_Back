@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.util.Optional;
 
 import fr.iutmontreuil.quizzard.features.cours.domain.Cours;
+import fr.iutmontreuil.quizzard.features.cours.domain.FichierVersion;
 
 /** Accès aux cours d'un enseignant. */
 public interface CoursRepository {
@@ -21,6 +22,9 @@ public interface CoursRepository {
 
     /** Vrai si la version appartient à ce cours (n'importe quelle version, pas seulement la dernière). */
     boolean versionAppartient(Long idVersion, Long idCours);
+
+    /** Fichier de la version, si elle appartient à ce cours ; vide sinon. */
+    Optional<FichierVersion> fichierDe(Long idVersion, Long idCours);
 
     /** Met à jour la date de dernière modification du cours (affichée sur E2). */
     void marquerModifie(Long idCours, LocalDateTime maintenant);

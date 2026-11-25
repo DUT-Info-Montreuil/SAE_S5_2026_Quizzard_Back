@@ -113,7 +113,7 @@ la ressource), « Étu. » = étudiant avec jeton de participant, « Admin » = 
 | `GET` | `/api/cours/{idCours}` | Ens. | M | Détail d'un cours et de ses versions |
 | `PATCH` | `/api/cours/{idCours}` | Ens. | M | Renommer ou archiver `{titre?, archive?}` |
 | `POST` | `/api/cours/{idCours}/versions` | Ens. | M | Nouvelle version du PDF (multipart) → `201` version + pages proposées (`valide = false`) |
-| `GET` | `/api/cours/{idCours}/versions/{idVersion}/fichier` | Ens. ou Étu. de la séance | M | Le PDF (`application/pdf`), jamais servi en accès direct. **À faire avec l'UC2** (stockage des fichiers) |
+| `GET` | `/api/cours/{idCours}/versions/{idVersion}/fichier` | Ens. (Étu. de la séance plus tard) | M | **Fait (éditeur E3, enseignant seulement).** Le PDF (`application/pdf`), jamais servi en accès direct (voir ci-dessous) |
 | `GET` | `/api/cours/{idCours}/versions/{idVersion}/pages` | Ens. | M | **Fait (UC3, éditeur E3).** Pages insérées de la version, dans l'ordre (voir ci-dessous) |
 | `POST` | `/api/cours/{idCours}/pages-quiz` | Ens. | M | **Fait (UC3).** Insérer une page de quiz (voir ci-dessous) → `201` |
 | `POST` | `/api/cours/{idCours}/versions/{idVersion}/pages` | Ens. | M | Insérer une page de classement `{numeroPage, ordre, idClassement}` (UC11) → `201` |
@@ -158,6 +158,18 @@ Réponse `201`, en-tête `Location: /api/cours/{idCours}/pages/{idPage}` :
 | Quiz inexistant, archivé ou d'un autre cours | `404` | `QUIZ_INTROUVABLE` | Quiz introuvable. |
 | Quiz en cours de séance | `409` | `QUIZ_EN_SEANCE` | Ce quiz est en cours de séance : réessayez après sa clôture. |
 | Erreur de base de données (rien n'est créé) | `500` | — | Message générique |
+
+**PDF d'une version (éditeur E3).** `GET /api/cours/{idCours}/versions/{idVersion}/fichier`, lu par PDF.js pour
+l'aperçu, les miniatures et le repère de texte de l'UC3. Enseignant propriétaire seulement ; l'accès des étudiants
+viendra avec l'affichage du cours en séance.
+
+- `200`, corps = le PDF, `Content-Type: application/pdf`, `Content-Disposition: inline`,
+  `X-Content-Type-Options: nosniff`, `Cache-Control: private`.
+- Requêtes `Range` prises en charge (`206 Partial Content`) : PDF.js lit le fichier par tranches.
+- `404` `COURS_INTROUVABLE` (cours inexistant ou d'un autre enseignant), `404` `VERSION_INTROUVABLE` (version d'un
+  autre cours), `404` `FICHIER_INTROUVABLE` (fichier supprimé par l'administrateur, UC20, ou absent du disque).
+- Le chemin enregistré en base est lu dans le dossier de stockage (`STOCKAGE_DOSSIER`) ; un chemin absolu ou avec
+  `../` n'est jamais lu.
 
 **Pages d'une version (éditeur E3).** Une page se décrit partout de la même façon (réponse du `POST`, du `GET` et du
 `PATCH`) : `{idPage, numeroPage, ordre, type, idQuestion, idQuiz, titreQuiz}`, `type` = `QUIZ` ou `CLASSEMENT`

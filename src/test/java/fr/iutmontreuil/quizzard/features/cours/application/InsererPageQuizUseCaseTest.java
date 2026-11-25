@@ -27,6 +27,7 @@ import fr.iutmontreuil.quizzard.features.cours.domain.Cours;
 import fr.iutmontreuil.quizzard.features.cours.domain.CoursArchiveException;
 import fr.iutmontreuil.quizzard.features.cours.domain.CoursIntrouvableException;
 import fr.iutmontreuil.quizzard.features.cours.domain.EmplacementInvalideException;
+import fr.iutmontreuil.quizzard.features.cours.domain.FichierVersion;
 import fr.iutmontreuil.quizzard.features.cours.domain.PageInseree;
 import fr.iutmontreuil.quizzard.features.cours.domain.PageInseree.TypePage;
 import fr.iutmontreuil.quizzard.features.cours.domain.PagePlacee;
@@ -158,6 +159,11 @@ class InsererPageQuizUseCaseTest {
         @Override
         public boolean versionAppartient(Long idVersion, Long idCours) {
             return VERSION.equals(idVersion);
+        }
+
+        @Override
+        public Optional<FichierVersion> fichierDe(Long idVersion, Long idCours) {
+            throw new UnsupportedOperationException();
         }
     }
 
