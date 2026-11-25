@@ -45,6 +45,25 @@ class PostgresCoursRepository implements CoursRepository {
     }
 
     @Override
+    public Optional<Cours> trouver(Long idCours, Long idEnseignant) {
+        return jdbc.sql("SELECT id_cours, id_enseignant, archive FROM cours "
+                        + "WHERE id_cours = :idCours AND id_enseignant = :idEnseignant")
+                .param("idCours", idCours)
+                .param("idEnseignant", idEnseignant)
+                .query((l, i) -> new Cours(l.getLong("id_cours"), l.getLong("id_enseignant"),
+                        l.getBoolean("archive"), derniereVersion(idCours).orElse(null)))
+                .optional();
+    }
+
+    @Override
+    public boolean versionAppartient(Long idVersion, Long idCours) {
+        return jdbc.sql("SELECT EXISTS (SELECT 1 FROM version_cours WHERE id_version = :idVersion "
+                        + "AND id_cours = :idCours)")
+                .param("idVersion", idVersion).param("idCours", idCours)
+                .query(Boolean.class).single();
+    }
+
+    @Override
     public void marquerModifie(Long idCours, LocalDateTime maintenant) {
         jdbc.sql("UPDATE cours SET date_modification = :maintenant WHERE id_cours = :idCours")
                 .param("maintenant", maintenant)

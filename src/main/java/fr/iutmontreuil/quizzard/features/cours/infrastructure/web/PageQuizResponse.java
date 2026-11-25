@@ -18,13 +18,9 @@ record PageQuizResponse(
         int ordre,
         List<PageResponse> pages) {
 
-    record PageResponse(Long idPage, int numeroPage, int ordre, String type) {
-    }
-
     static PageQuizResponse de(PageQuizInseree r) {
         return new PageQuizResponse(r.page().idPage(), r.quiz().idQuiz(), r.quiz().titre(), r.quizCree(),
                 r.idQuestion(), r.page().numeroPage(), r.page().ordre(),
-                r.pages().stream().map(p -> new PageResponse(p.idPage(), p.numeroPage(), p.ordre(), p.type().name()))
-                        .toList());
+                PageResponse.de(r.pages()));
     }
 }

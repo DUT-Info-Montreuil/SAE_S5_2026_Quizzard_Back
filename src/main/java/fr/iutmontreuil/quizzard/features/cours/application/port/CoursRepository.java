@@ -16,6 +16,12 @@ public interface CoursRepository {
      */
     Optional<Cours> trouverPourModification(Long idCours, Long idEnseignant);
 
+    /** Cours avec sa dernière version, en lecture seule ; vide s'il n'existe pas ou appartient à un autre enseignant. */
+    Optional<Cours> trouver(Long idCours, Long idEnseignant);
+
+    /** Vrai si la version appartient à ce cours (n'importe quelle version, pas seulement la dernière). */
+    boolean versionAppartient(Long idVersion, Long idCours);
+
     /** Met à jour la date de dernière modification du cours (affichée sur E2). */
     void marquerModifie(Long idCours, LocalDateTime maintenant);
 }

@@ -29,6 +29,7 @@ import fr.iutmontreuil.quizzard.features.cours.domain.CoursIntrouvableException;
 import fr.iutmontreuil.quizzard.features.cours.domain.EmplacementInvalideException;
 import fr.iutmontreuil.quizzard.features.cours.domain.PageInseree;
 import fr.iutmontreuil.quizzard.features.cours.domain.PageInseree.TypePage;
+import fr.iutmontreuil.quizzard.features.cours.domain.PagePlacee;
 import fr.iutmontreuil.quizzard.features.cours.domain.PageQuiz;
 import fr.iutmontreuil.quizzard.features.cours.domain.Question;
 import fr.iutmontreuil.quizzard.features.cours.domain.Quiz;
@@ -148,6 +149,16 @@ class InsererPageQuizUseCaseTest {
         public void marquerModifie(Long idCours, LocalDateTime maintenant) {
             coursModifieLe = maintenant;
         }
+
+        @Override
+        public Optional<Cours> trouver(Long idCours, Long idEnseignant) {
+            return trouverPourModification(idCours, idEnseignant);
+        }
+
+        @Override
+        public boolean versionAppartient(Long idVersion, Long idCours) {
+            return VERSION.equals(idVersion);
+        }
     }
 
     private class Quiz_ implements QuizRepository {
@@ -208,8 +219,41 @@ class InsererPageQuizUseCaseTest {
         @Override
         public List<PageInseree> listerParVersion(Long idVersion) {
             return lesPages.stream()
-                    .map(p -> new PageInseree(p.idPage(), p.numeroPage(), p.ordre(), TypePage.QUIZ))
+                    .map(p -> new PageInseree(p.idPage(), p.numeroPage(), p.ordre(), TypePage.QUIZ, p.idQuestion(),
+                            null, null))
                     .toList();
+        }
+
+        // Retrait et déplacement : testés de bout en bout sur PostgreSQL (PagesWebTest), pas par l'insertion.
+
+        @Override
+        public Optional<PagePlacee> trouverParId(Long idPage) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public int compterAuMemeEndroitSauf(Long idVersion, int numeroPage, Long idPageExclue) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void decalerOrdresSauf(Long idVersion, int numeroPage, int aPartirDe, Long idPageExclue) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void placer(Long idPage, int numeroPage, int ordre) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void supprimer(Long idPage) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void recaler(Long idVersion, int numeroPage, Long idPageExclue) {
+            throw new UnsupportedOperationException();
         }
     }
 

@@ -113,12 +113,12 @@ la ressource), « Étu. » = étudiant avec jeton de participant, « Admin » = 
 | `GET` | `/api/cours/{idCours}` | Ens. | M | Détail d'un cours et de ses versions |
 | `PATCH` | `/api/cours/{idCours}` | Ens. | M | Renommer ou archiver `{titre?, archive?}` |
 | `POST` | `/api/cours/{idCours}/versions` | Ens. | M | Nouvelle version du PDF (multipart) → `201` version + pages proposées (`valide = false`) |
-| `GET` | `/api/cours/{idCours}/versions/{idVersion}/fichier` | Ens. ou Étu. de la séance | M | Le PDF (`application/pdf`), jamais servi en accès direct |
-| `GET` | `/api/cours/{idCours}/versions/{idVersion}/pages` | Ens. | M | Pages insérées de la version, dans l'ordre |
+| `GET` | `/api/cours/{idCours}/versions/{idVersion}/fichier` | Ens. ou Étu. de la séance | M | Le PDF (`application/pdf`), jamais servi en accès direct. **À faire avec l'UC2** (stockage des fichiers) |
+| `GET` | `/api/cours/{idCours}/versions/{idVersion}/pages` | Ens. | M | **Fait (UC3, éditeur E3).** Pages insérées de la version, dans l'ordre (voir ci-dessous) |
 | `POST` | `/api/cours/{idCours}/pages-quiz` | Ens. | M | **Fait (UC3).** Insérer une page de quiz (voir ci-dessous) → `201` |
 | `POST` | `/api/cours/{idCours}/versions/{idVersion}/pages` | Ens. | M | Insérer une page de classement `{numeroPage, ordre, idClassement}` (UC11) → `201` |
-| `PATCH` | `/api/pages/{idPage}` | Ens. | M | Déplacer une page `{numeroPage, ordre}` |
-| `DELETE` | `/api/pages/{idPage}` | Ens. | M | Retirer une page (la question n'est pas supprimée) → `204` |
+| `PATCH` | `/api/pages/{idPage}` | Ens. | M | **Fait (éditeur E3).** Déplacer une page `{numeroPage, ordre}` → `200` pages de la version à jour |
+| `DELETE` | `/api/pages/{idPage}` | Ens. | M | **Fait (règle de l'UC3 : confirmation côté front).** Retirer une page (la question n'est pas supprimée) → `204` |
 | `POST` | `/api/cours/{idCours}/versions/{idVersion}/pages/validation` | Ens. | M | Valider les positions proposées après réapplication (UC6) |
 
 **Insérer une page de quiz (UC3).** Route du dossier de conception. Enseignant connecté et propriétaire du cours,
@@ -142,8 +142,8 @@ Réponse `201`, en-tête `Location: /api/cours/{idCours}/pages/{idPage}` :
 {
   "idPage": 12, "idQuiz": 3, "titreQuiz": "Quiz 1", "quizCree": false, "idQuestion": 40,
   "numeroPage": 4, "ordre": 0,
-  "pages": [ { "idPage": 9, "numeroPage": 2, "ordre": 0, "type": "QUIZ" },
-             { "idPage": 12, "numeroPage": 4, "ordre": 0, "type": "QUIZ" } ]
+  "pages": [ { "idPage": 9, "numeroPage": 2, "ordre": 0, "type": "QUIZ", "idQuestion": 31, "idQuiz": 3, "titreQuiz": "Quiz 1" },
+             { "idPage": 12, "numeroPage": 4, "ordre": 0, "type": "QUIZ", "idQuestion": 40, "idQuiz": 3, "titreQuiz": "Quiz 1" } ]
 }
 ```
 
@@ -158,6 +158,29 @@ Réponse `201`, en-tête `Location: /api/cours/{idCours}/pages/{idPage}` :
 | Quiz inexistant, archivé ou d'un autre cours | `404` | `QUIZ_INTROUVABLE` | Quiz introuvable. |
 | Quiz en cours de séance | `409` | `QUIZ_EN_SEANCE` | Ce quiz est en cours de séance : réessayez après sa clôture. |
 | Erreur de base de données (rien n'est créé) | `500` | — | Message générique |
+
+**Pages d'une version (éditeur E3).** Une page se décrit partout de la même façon (réponse du `POST`, du `GET` et du
+`PATCH`) : `{idPage, numeroPage, ordre, type, idQuestion, idQuiz, titreQuiz}`, `type` = `QUIZ` ou `CLASSEMENT`
+(`idQuestion`, `idQuiz` et `titreQuiz` nuls pour une page de classement). Lire ou paramétrer la question elle-même
+relève de l'UC4/UC5 (§3.3).
+
+- `GET /api/cours/{idCours}/versions/{idVersion}/pages` → `200` tableau dans l'ordre (page du PDF, puis rang). Toute
+  version du cours se lit. `404` `COURS_INTROUVABLE` (cours inexistant ou d'un autre enseignant),
+  `404` `VERSION_INTROUVABLE` (version d'un autre cours).
+- `DELETE /api/pages/{idPage}` → `204`. La question et le quiz sont conservés, même si le quiz n'a plus de page. Les
+  pages restées au même endroit sont renumérotées (rangs 0, 1, 2…). Action sensible journalisée. Le front demande
+  une confirmation avant l'appel.
+- `PATCH /api/pages/{idPage}` `{numeroPage, ordre}` → `200` pages de la version à jour. `ordre` est le rang parmi les
+  autres pages déjà à cet endroit (de 0 à leur nombre) ; l'ancien et le nouvel endroit sont renumérotés.
+
+| Cas (retirer, déplacer) | Statut | `code` |
+|---|---|---|
+| Page inexistante ou d'un cours d'un autre enseignant | `404` | `PAGE_INTROUVABLE` |
+| Cours archivé | `409` | `COURS_ARCHIVE` |
+| Page d'une version qui n'est plus la dernière | `409` | `VERSION_PERIMEE` |
+| Page d'un quiz en cours de séance (ses questions changeraient de position) | `409` | `QUIZ_EN_SEANCE` |
+| Emplacement hors du cours (`PATCH`) | `422` | `EMPLACEMENT_INVALIDE` |
+| Corps incomplet ou négatif (`PATCH`) | `400` | `REQUETE_INVALIDE` |
 
 ### 3.3 Quiz et questions (`quiz`) : UC4, UC5, UC13, UC14
 
