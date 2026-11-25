@@ -128,6 +128,14 @@ Règles :
 | Noté | Lien ou QR code → identifiant + mot de passe IUT → entrer | Rôle étudiant exigé ; un pseudonyme d'affichage est proposé ; une nouvelle connexion du même compte remplace la précédente. |
 | Noté, annuaire indisponible | L'enseignant autorise l'entrée « identité non vérifiée » | Nom et identifiant saisis, `identite_verifiee = false`, signalés dans les résultats et l'export. |
 
+- Pseudonyme : nettoyé avant tout contrôle (normalisation Unicode NFC, suites d'espaces réduites à une, espaces de
+  début et de fin retirés), puis 2 à 20 caractères sans caractère de contrôle. L'unicité se compare à l'identique,
+  comme la contrainte `uq_participant_pseudonyme` : `Alice` et `alice` sont deux pseudonymes **(à valider)**. Le
+  pseudonyme proposé ajoute 2, 3, 4… à la fin (`Alice2`) en restant à 20 caractères.
+- Jeton de participant : 32 octets tirés par `SecureRandom`, encodés en Base64url (43 caractères) ; seule son
+  empreinte SHA-256 (64 caractères hexadécimaux minuscules) est stockée dans `participant.jeton_reconnexion`.
+- Entrée tout ou rien : le participant est enregistré dans une transaction, l'écriture est forcée, et le nombre de
+  connectés n'est diffusé à l'enseignant qu'après le commit.
 - Arrivée en retard : le participant rejoint la question en cours, sans points pour les questions manquées.
 - Coupure réseau : le front renvoie son jeton de reconnexion ; le participant retrouve la question en cours et ses
   réponses déjà confirmées.
@@ -249,6 +257,11 @@ La règle exacte de repérage (taille du repère, tolérance) est à confirmer p
 
 - Utiliser le port `JournalEvenements` dans les cas d'usage, jamais un logger directement.
 - Jamais de nom, de pseudonyme, d'e-mail, de mot de passe, de texte de réponse ni de contenu de fichier dans les logs.
+  Ni de jeton de participant, ni d'empreinte de jeton. Les objets de l'UC8 qui portent ces valeurs
+  (`Pseudonyme`, `ParticipantEntrant`, DTO) masquent leur contenu dans `toString()`.
+- Hibernate recopie les valeurs d'une violation de contrainte PostgreSQL dans ses logs (`Key (id_session,
+  pseudonyme)=(3, Alice) already exists`) : le logger `org.hibernate.orm.jdbc.error` est coupé dans
+  `application.properties`. L'exception reste levée et traduite par `GestionnaireErreurs`, sans valeur.
 - `actionSensible` pour : connexion, import, suppression, archivage, lancement de séance, correction, export.
 
 ### Tests
