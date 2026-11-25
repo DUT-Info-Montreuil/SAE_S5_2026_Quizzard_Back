@@ -21,6 +21,7 @@ Contrat entre le back-end Spring Boot et le front React : routes REST et canal t
 | Identifiants | Entiers (`id*`) ; les séances sont aussi désignées par leur `codeAcces` dans les routes publiques |
 | Pagination | Inutile aux volumes prévus ; si besoin plus tard : `?page=0&taille=50` |
 | Traçabilité | Chaque réponse porte l'en-tête `X-Request-Id`, exposé au front par CORS |
+| Heure du serveur | En-tête `Date` de chaque réponse, exposé au front par CORS (calage du décompte, §4) |
 
 ### Authentification
 
@@ -29,6 +30,7 @@ Contrat entre le back-end Spring Boot et le front React : routes REST et canal t
   toute requête qui modifie des données (`POST`, `PUT`, `PATCH`, `DELETE`).
 - **Étudiant** : routes `/api/public/**`. Après avoir rejoint une séance, l'étudiant reçoit un **jeton de
   participant** à renvoyer dans l'en-tête `X-Jeton-Participant`. Le jeton n'est valable que pour cette séance.
+  Ces routes sont ouvertes sans session et hors CSRF : le contrôle d'accès repose sur ce jeton.
 - Développement : `SECURITE_OUVERTE=true` dans `.env` ouvre toutes les routes et coupe le CSRF (jamais sur le serveur).
 
 ### Codes de statut
@@ -38,14 +40,14 @@ Contrat entre le back-end Spring Boot et le front React : routes REST et canal t
 | `200 OK` | Lecture ou action réussie avec un corps |
 | `201 Created` | Ressource créée (en-tête `Location`) |
 | `204 No Content` | Action réussie sans corps |
-| `400 Bad Request` | Requête mal formée (JSON illisible, paramètre au mauvais type) |
+| `400 Bad Request` | Requête mal formée (JSON illisible, paramètre au mauvais type) ou champ refusé par la validation (`@Valid`), code `REQUETE_INVALIDE` |
 | `401 Unauthorized` | Pas connecté, session expirée, jeton de participant absent ou invalide |
 | `403 Forbidden` | Connecté sans le droit (ressource d'un autre enseignant), jeton CSRF absent |
 | `404 Not Found` | Ressource introuvable |
 | `409 Conflict` | Conflit avec l'état actuel : doublon, question verrouillée, réponse hors délai ou déjà donnée, séance close |
 | `413 Payload Too Large` | Fichier de plus de 50 Mo |
 | `415 Unsupported Media Type` | Fichier qui n'est pas un PDF ou une image acceptée |
-| `422 Unprocessable Entity` | Données refusées par la validation ou par une règle métier |
+| `422 Unprocessable Entity` | Données bien formées refusées par une règle métier |
 | `500 Internal Server Error` | Erreur imprévue (message générique, détail seulement dans les logs) |
 
 ### Format des erreurs
@@ -59,13 +61,26 @@ Toutes les erreurs, y compris 401 et 403, ont la même forme (`ReponseErreur`) :
 }
 ```
 
-Une erreur de validation (422) ajoute `champs`, un message par champ fautif :
+Une erreur de validation (`400`, code `REQUETE_INVALIDE`, comme dans les tableaux d'erreurs du dossier de conception)
+ajoute `champs`, un message par champ fautif :
 
 ```json
 {
   "error": "Certaines valeurs sont invalides.",
   "request_id": "…",
-  "champs": { "titre": "Le titre est obligatoire." }
+  "champs": { "titre": "Le titre est obligatoire." },
+  "code": "REQUETE_INVALIDE"
+}
+```
+
+Une erreur métier qui a un code stable l'ajoute dans `code`, en majuscules. Le front s'en sert quand le statut ne
+suffit pas à choisir le message (plusieurs causes de 409, par exemple). Sans code, le champ est absent :
+
+```json
+{
+  "error": "Tu as déjà répondu.",
+  "request_id": "…",
+  "code": "DEJA_REPONDU"
 }
 ```
 
