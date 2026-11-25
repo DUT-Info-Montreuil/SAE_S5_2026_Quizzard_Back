@@ -24,6 +24,22 @@ Les règles marquées **(à valider)** sont des propositions de l'équipe qui at
 Les objets du domaine sont des classes Java simples (records pour les objets valeur). Les entités JPA vivent dans
 `infrastructure/persistance` et sont converties vers ou depuis le domaine par l'adaptateur du dépôt.
 
+### Importer un cours (UC2)
+
+- Ordre : titre, écriture dans un fichier temporaire (taille réelle et SHA-256), analyse du PDF, doublon, rangement,
+  enregistrement, action sensible `cours_importe`. Le fichier temporaire est supprimé dans tous les cas.
+- Tout ou rien : une transaction annulée supprime le fichier rangé. Si l'issue de la validation est inconnue, le
+  fichier est gardé et sera traité comme orphelin.
+- Doublon : même empreinte dans un cours **non archivé** du même enseignant. Les imports d'un enseignant passent l'un
+  après l'autre (ligne verrouillée), pour qu'un double clic ne crée pas deux cours. Le refus n'est tracé que dans les
+  logs (`import_refuse_doublon`).
+- PDF refusé : signature `%PDF-` absente du début (415) ; corrompu, sans page ou **chiffré**, même sans mot de passe
+  d'ouverture (422) *(à valider)*.
+- Le nom d'origine du fichier est gardé pour l'affichage, sans dossier. Ni lui, ni le titre, ni le contenu du
+  fichier n'apparaissent dans les logs d'un import réussi, et les logs de PDFBox sont coupés. Seul le message du
+  doublon, qui cite le titre du cours existant, est journalisé.
+- Classes : `CoursImporte` et `VersionImportee` (dossier : `Cours` et `VersionCours`).
+
 ## 2. Types de questions
 
 | Type | Priorité | Saisie enseignant | Réponse étudiant | Validité minimale |
