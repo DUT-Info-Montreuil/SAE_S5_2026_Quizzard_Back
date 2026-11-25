@@ -35,3 +35,6 @@ build/
 ### Variables d'environnement (secrets locaux) ###
 .env
 .env.local
+
+### PDF importés en développement (jamais dans Git) ###
+/stockage/
