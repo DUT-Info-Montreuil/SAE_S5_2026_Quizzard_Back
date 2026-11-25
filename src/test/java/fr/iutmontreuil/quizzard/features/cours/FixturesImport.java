@@ -8,8 +8,8 @@ import java.util.UUID;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 /**
- * Enseignants de test, que l'application ne sait pas encore créer. {@link #nettoyer()} supprime ceux qui ont été
- * créés, avec les cours qu'ils ont importés.
+ * Enseignants de test, que l'application ne sait pas encore créer, et leurs cours. {@link #nettoyer()} supprime les
+ * enseignants créés, avec leurs cours, versions et quiz.
  */
 public class FixturesImport {
 
@@ -46,8 +46,54 @@ public class FixturesImport {
                 .query(Integer.class).single();
     }
 
+    /** Un cours non archivé sans version : {@link #ajouterVersion} lui en donne une. */
+    public Long creerCours(Enseignant enseignant, String titre, LocalDateTime dateModification) {
+        return jdbc.sql("""
+                        INSERT INTO cours (titre, date_creation, date_modification, id_enseignant)
+                        VALUES (:titre, :date, :date, :enseignant)
+                        RETURNING id_cours
+                        """)
+                .param("titre", titre)
+                .param("date", dateModification)
+                .param("enseignant", enseignant.id())
+                .query(Long.class).single();
+    }
+
+    /** Une version d'un cours, sans fichier sur le disque. */
+    public Long ajouterVersion(Long idCours, int numero, int nbPages) {
+        return jdbc.sql("""
+                        INSERT INTO version_cours (numero, nom_fichier, chemin_stockage, taille_octets, nb_pages,
+                                                   empreinte, date_import, id_cours)
+                        VALUES (:numero, 'cours.pdf', :chemin, 1, :nbPages, :empreinte, :maintenant, :idCours)
+                        RETURNING id_version
+                        """)
+                .param("numero", numero)
+                .param("chemin", "cours/" + UUID.randomUUID() + ".pdf")
+                .param("nbPages", nbPages)
+                .param("empreinte", "a".repeat(64))
+                .param("maintenant", LocalDateTime.now())
+                .param("idCours", idCours)
+                .query(Long.class).single();
+    }
+
+    public void ajouterQuiz(Long idCours, boolean archive) {
+        jdbc.sql("""
+                        INSERT INTO quiz (titre, duree_par_defaut_sec, affichage_cours, archive, id_cours)
+                        VALUES ('Quiz', 20, 'PROJETE_SEUL', :archive, :idCours)
+                        """)
+                .param("archive", archive)
+                .param("idCours", idCours)
+                .update();
+    }
+
+    public void archiver(Long idCours) {
+        jdbc.sql("UPDATE cours SET archive = TRUE WHERE id_cours = :id").param("id", idCours).update();
+    }
+
     public void nettoyer() {
         for (Long id : enseignants) {
+            jdbc.sql("DELETE FROM quiz WHERE id_cours IN "
+                    + "(SELECT id_cours FROM cours WHERE id_enseignant = :id)").param("id", id).update();
             jdbc.sql("DELETE FROM version_cours WHERE id_cours IN "
                     + "(SELECT id_cours FROM cours WHERE id_enseignant = :id)").param("id", id).update();
             jdbc.sql("DELETE FROM cours WHERE id_enseignant = :id").param("id", id).update();

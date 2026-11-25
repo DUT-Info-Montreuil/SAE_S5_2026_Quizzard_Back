@@ -1,5 +1,6 @@
 package fr.iutmontreuil.quizzard.features.cours.infrastructure.web;
 
+import fr.iutmontreuil.quizzard.features.cours.application.dto.CoursConsulte;
 import fr.iutmontreuil.quizzard.features.cours.domain.CoursImporte;
 import fr.iutmontreuil.quizzard.features.cours.domain.VersionImportee;
 
@@ -14,5 +15,16 @@ final class CoursMapper {
         VersionImportee version = cours.derniereVersion();
         return new CoursResponse(cours.idCours(), cours.titre(), version.numero(), version.nbPages(), 0,
                 cours.dateModification());
+    }
+
+    /** Cours de la liste « Mes cours » : même forme que la réponse de l'import. */
+    static CoursResponse versReponse(CoursConsulte cours) {
+        return new CoursResponse(cours.idCours(), cours.titre(), cours.numeroVersion(), cours.nbPages(),
+                cours.nbQuiz(), cours.dateModification());
+    }
+
+    static CoursOuvertResponse versReponseOuverte(CoursConsulte cours) {
+        return new CoursOuvertResponse(cours.idCours(), cours.titre(), cours.idVersion(), cours.numeroVersion(),
+                cours.nbPages(), cours.nbQuiz(), cours.dateModification());
     }
 }

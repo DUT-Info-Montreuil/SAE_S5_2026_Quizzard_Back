@@ -137,12 +137,40 @@ Le contrôle porte sur le contenu (signature `%PDF-` au début, lecture par PDFB
 annoncé. Le fichier est rangé sous un nom tiré au hasard, dans un dossier qu'aucune route ne sert. Au-delà de 100 Mo,
 le serveur coupe la connexion au lieu de répondre `413` : le front contrôle la taille avant d'envoyer.
 
+**Fait (UC2) : `GET /api/cours` et `GET /api/cours/{idCours}`**, liste « Mes cours » (écran E2) et bouton
+« Ouvrir ». Enseignant connecté ; il ne voit que ses cours **non archivés** (un cours archivé par l'administrateur,
+UC20, est retiré de son espace).
+
+`GET /api/cours` → `200`, un tableau sans enveloppe (vide s'il n'a pas de cours), chaque élément ayant la forme de la
+réponse de l'import, le cours modifié le plus récemment en premier *(à valider)* :
+
+```json
+[ { "idCours": 4, "titre": "Réseaux", "numeroVersion": 1, "nbPages": 12, "nbQuiz": 0,
+    "dateModification": "2026-11-25T14:00:00" } ]
+```
+
+`GET /api/cours/{idCours}` → `200`, les mêmes champs plus `idVersion`, la dernière version : celle que l'éditeur (E3)
+ouvre, où insérer une page (UC3) et sur laquelle lancer un quiz (UC7) :
+
+```json
+{ "idCours": 4, "titre": "Réseaux", "idVersion": 9, "numeroVersion": 1, "nbPages": 12, "nbQuiz": 0,
+  "dateModification": "2026-11-25T14:00:00" }
+```
+
+`numeroVersion` et `nbPages` (pages du PDF) sont ceux de la dernière version. `nbQuiz` compte les quiz non archivés
+du cours : un quiz appartient au cours, pas à une version. `dateModification` est celle du cours.
+
+| Cas (liste et ouverture) | Statut | `code` | `error` |
+|---|---|---|---|
+| Pas connecté | `401` | — | Vous devez être connecté. |
+| `idCours` qui n'est pas un nombre | `400` | — | La requête est mal formée. |
+| Cours inexistant, archivé ou d'un autre enseignant | `404` | `COURS_INTROUVABLE` | Cours introuvable. |
 
 | Méthode | Route | Accès | Prio | Description |
 |---|---|---|---|---|
-| `GET` | `/api/cours` | Ens. | M | Mes cours (E2) : titre, dernière version, nombre de quiz, dernière modification |
+| `GET` | `/api/cours` | Ens. | M | **Fait (UC2), détail ci-dessus.** Mes cours (E2) : titre, dernière version, nombre de quiz, dernière modification |
 | `POST` | `/api/cours` | Ens. | M | **Fait (UC2), détail ci-dessus.** Importer un PDF → `201` cours en v1 ; `409` PDF déjà importé ; `413` ; `415` ; `422` |
-| `GET` | `/api/cours/{idCours}` | Ens. | M | Détail d'un cours et de ses versions |
+| `GET` | `/api/cours/{idCours}` | Ens. | M | **Fait (UC2), détail ci-dessus.** Cours et sa dernière version ; la liste de ses versions viendra avec l'UC6 |
 | `PATCH` | `/api/cours/{idCours}` | Ens. | M | Renommer ou archiver `{titre?, archive?}` |
 | `POST` | `/api/cours/{idCours}/versions` | Ens. | M | Nouvelle version du PDF (multipart) → `201` version + pages proposées (`valide = false`) |
 | `GET` | `/api/cours/{idCours}/versions/{idVersion}/fichier` | Ens. ou Étu. de la séance | M | Le PDF (`application/pdf`), jamais servi en accès direct |
