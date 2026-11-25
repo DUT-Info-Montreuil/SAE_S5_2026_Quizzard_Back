@@ -40,6 +40,15 @@ Les objets du domaine sont des classes Java simples (records pour les objets val
   doublon, qui cite le titre du cours existant, est journalisé.
 - Classes : `CoursImporte` et `VersionImportee` (dossier : `Cours` et `VersionCours`).
 
+### Lister et ouvrir ses cours (E2, E3)
+
+- Un enseignant ne lit que ses cours non archivés. Un cours inconnu, archivé ou d'un autre enseignant répond le même
+  404 : son existence n'est pas révélée.
+- La liste présente le cours modifié le plus récemment en premier, à date égale le dernier créé *(à valider)*.
+- La dernière version est celle de numéro le plus élevé. Le nombre de quiz est celui des quiz non archivés du cours.
+- Lecture directe en SQL dans le modèle `CoursConsulte` (une requête, quel que soit le nombre de cours) : ces écrans
+  n'appliquent aucune règle de modification.
+
 ## 2. Types de questions
 
 | Type | Priorité | Saisie enseignant | Réponse étudiant | Validité minimale |
