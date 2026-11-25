@@ -161,7 +161,7 @@ sequenceDiagram
     API->>DB: participant + jeton de reconnexion
     API-->>Etu: jeton
     API-)WS: /topic/sessions/{code}/connectes
-    Ens->>API: POST /api/sessions/{id}/question-suivante
+    Ens->>API: POST /api/sessions/{id}/questions/suivante
     API->>DB: position_courante, echeance_question (horloge serveur)
     API-)WS: /topic/sessions/{code}/question (énoncé SANS réponses attendues)
     Etu->>API: POST /api/public/sessions/{code}/reponses
@@ -231,6 +231,7 @@ L'interrupteur `SECURITE_OUVERTE` (fichier `.env`) ouvre toutes les routes pour 
 | `DB_PORT` | `5433` | Port côté machine (le 5432 est souvent déjà pris) |
 | `FRONT_URL` | `http://localhost:5173` | Origine autorisée par CORS |
 | `SECURITE_OUVERTE` | `false` | Développement uniquement |
+| `LDAP_URL` | vide | Annuaire de l'IUT en `ldaps://`, lu au lancement d'un quiz noté (UC7). Vide : annuaire indisponible |
 
 - En développement, `spring-boot-docker-compose` démarre PostgreSQL au lancement de l'application.
 - En test, **Testcontainers** démarre un PostgreSQL 18 (`TestcontainersConfiguration`) : Docker est nécessaire.
