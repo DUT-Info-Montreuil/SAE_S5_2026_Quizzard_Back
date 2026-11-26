@@ -21,12 +21,14 @@ import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import fr.iutmontreuil.quizzard.TestcontainersConfiguration;
@@ -90,16 +92,28 @@ class SocleWebTest {
         mvc.perform(get("/test/panne"))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.error").value("Une erreur est survenue. Réessayez dans un instant."))
+                .andExpect(jsonPath("$.code").value("ERREUR_SERVEUR"))
                 .andExpect(content().string(not(containsString("secret-technique"))));
     }
 
     @Test
     @WithMockUser
-    void un_dto_invalide_renvoie_422_avec_un_message_par_champ() throws Exception {
+    void une_contrainte_de_base_violee_renvoie_500_erreur_serveur_sans_detail() throws Exception {
+        mvc.perform(get("/test/contrainte"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.code").value("ERREUR_SERVEUR"))
+                .andExpect(jsonPath("$.error").value("Une erreur est survenue. Réessayez dans un instant."))
+                .andExpect(content().string(not(containsString("valeur-en-double"))));
+    }
+
+    @Test
+    @WithMockUser
+    void un_dto_invalide_renvoie_400_requete_invalide_avec_un_message_par_champ() throws Exception {
         mvc.perform(post("/test/valider").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"titre\": \"\"}"))
-                .andExpect(status().isUnprocessableContent())
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("REQUETE_INVALIDE"))
                 .andExpect(jsonPath("$.champs.titre").exists());
     }
 
@@ -109,6 +123,34 @@ class SocleWebTest {
         mvc.perform(get("/test/n-existe-pas"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error").value("Ressource introuvable."));
+    }
+
+    @Test
+    void une_exception_qui_porte_un_code_le_renvoie_au_client() throws Exception {
+        mvc.perform(post("/api/public/test/code"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("Tu as déjà répondu."))
+                .andExpect(jsonPath("$.code").value("DEJA_REPONDU"));
+    }
+
+    @Test
+    @WithMockUser
+    void une_exception_sans_code_n_ecrit_pas_le_champ_code() throws Exception {
+        mvc.perform(get("/test/conflit"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").doesNotExist());
+    }
+
+    @Test
+    void une_route_publique_repond_sans_connexion_ni_jeton_csrf() throws Exception {
+        mvc.perform(post("/api/public/test/ouverte"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void l_en_tete_date_est_lisible_par_le_front() throws Exception {
+        mvc.perform(get("/api/public/test/ouverte").header("Origin", "http://localhost:5173"))
+                .andExpect(header().string("Access-Control-Expose-Headers", containsString("Date")));
     }
 
     @Test
@@ -165,6 +207,17 @@ class SocleWebTest {
         }
     }
 
+    static class DejaRepondu extends ExceptionConflit {
+        DejaRepondu() {
+            super("Tu as déjà répondu.");
+        }
+
+        @Override
+        public String code() {
+            return "DEJA_REPONDU";
+        }
+    }
+
     record RequeteTest(@NotBlank String titre) {
     }
 
@@ -192,6 +245,11 @@ class SocleWebTest {
             throw new TitreInvalide();
         }
 
+        @GetMapping("/test/contrainte")
+        void contrainte() {
+            throw new DataIntegrityViolationException("duplicate key value valeur-en-double");
+        }
+
         @GetMapping("/test/panne")
         void panne() {
             throw new IllegalStateException("secret-technique : connexion au disque perdue");
@@ -199,6 +257,15 @@ class SocleWebTest {
 
         @PostMapping("/test/valider")
         void valider(@Valid @RequestBody RequeteTest requete) {
+        }
+
+        @RequestMapping("/api/public/test/ouverte")
+        void ouverte() {
+        }
+
+        @PostMapping("/api/public/test/code")
+        void code() {
+            throw new DejaRepondu();
         }
     }
 }

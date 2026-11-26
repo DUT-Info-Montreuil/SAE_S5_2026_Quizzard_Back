@@ -127,7 +127,9 @@ flowchart LR
 | Journalisation HTTP | `shared/infrastructure/journalisation/` | Filtre placé avant Spring Security : `request_id` (MDC + en-tête `X-Request-Id`), une ligne `request_handled` par requête. Logs au format JSON Lines (`logstash`). |
 | Sécurité | `shared/infrastructure/securite/SecurityConfig.java` | Refus par défaut, CORS limité à `FRONT_URL`, pas de formulaire ni de Basic ; interrupteur de développement `SECURITE_OUVERTE`. |
 | Erreurs HTTP | `shared/infrastructure/web/GestionnaireErreurs.java` | Seul endroit qui associe une exception à un statut HTTP ; forme unique `ReponseErreur`. |
-| Prévus | `shared/infrastructure/config`, `persistance`, `stockage` | Configuration commune, classes de base JPA, stockage des fichiers sur disque. |
+| Horloge | `shared/infrastructure/config/HorlogeConfig.java` | Bean `Clock` du serveur, reçu par les cas d'usage pour dater (tests avec horloge fixe). |
+| Suggestion d'erreur | `shared/domain/ExceptionConflitAvecSuggestion.java`, `shared/infrastructure/web/GestionnaireSuggestions.java` | Conflit qui propose une valeur de remplacement : le champ `suggestion` est ajouté à la réponse construite par `GestionnaireErreurs`, qui reste seul à choisir le statut. |
+| Prévus | `shared/infrastructure/persistance`, `stockage` | Classes de base JPA, stockage des fichiers sur disque. |
 
 ---
 
@@ -161,7 +163,7 @@ sequenceDiagram
     API->>DB: participant + jeton de reconnexion
     API-->>Etu: jeton
     API-)WS: /topic/sessions/{code}/connectes
-    Ens->>API: POST /api/sessions/{id}/question-suivante
+    Ens->>API: POST /api/sessions/{id}/questions/suivante
     API->>DB: position_courante, echeance_question (horloge serveur)
     API-)WS: /topic/sessions/{code}/question (énoncé SANS réponses attendues)
     Etu->>API: POST /api/public/sessions/{code}/reponses
@@ -212,7 +214,7 @@ Principes :
 | Authentification enseignant | Comptes locaux (empreinte BCrypt, `origine_compte = LOCAL`) pendant les premiers sprints, puis LDAP (`LDAP`, aucun mot de passe conservé). L'accès passe par un port `compte/application/port` pour pouvoir changer d'implémentation sans toucher aux cas d'usage. |
 | Session | Session HTTP côté serveur, cookie `HttpOnly`, `Secure`, `SameSite`, expiration après inactivité. |
 | CSRF | Actif pour les routes authentifiées (jeton lu par le front React). Désactivé seulement avec `SECURITE_OUVERTE=true`. |
-| Étudiants | Sans compte : jeton de participant propre à la session, invalidé à la clôture. Quiz noté : authentification LDAP, rôle étudiant exigé. |
+| Étudiants | Sans compte : jeton de participant propre à la session, invalidé à la clôture. Quiz noté : authentification LDAP, rôle étudiant exigé. Les routes `/api/public/**` sont ouvertes et exemptées de CSRF (ni cookie ni session) ; la poignée de main `/ws` est publique, et le contrôle du jeton à la connexion STOMP arrive avec l'UC9. |
 | Contrôle d'accès | Chaque cours, quiz, classement et séance n'est accessible qu'à son enseignant propriétaire (vérifié dans le cas d'usage, pas seulement dans le contrôleur). |
 | CORS | Seule l'origine `FRONT_URL` est autorisée, cookies compris. |
 | Abus | Limitation des tentatives de connexion et du nombre de connexions par appareil. |
@@ -229,8 +231,10 @@ L'interrupteur `SECURITE_OUVERTE` (fichier `.env`) ouvre toutes les routes pour 
 |---|---|---|
 | `DB_NAME`, `DB_USER`, `DB_PASSWORD` | `quizzard` | Base PostgreSQL de développement (`compose.yaml`) |
 | `DB_PORT` | `5433` | Port côté machine (le 5432 est souvent déjà pris) |
+| `STOCKAGE_DOSSIER` | `stockage` | Dossier des PDF importés (UC2), servi par aucune route ; un volume sauvegardé en production |
 | `FRONT_URL` | `http://localhost:5173` | Origine autorisée par CORS |
 | `SECURITE_OUVERTE` | `false` | Développement uniquement |
+| `LDAP_URL` | vide | Annuaire de l'IUT en `ldaps://`, lu au lancement d'un quiz noté (UC7). Vide : annuaire indisponible |
 
 - En développement, `spring-boot-docker-compose` démarre PostgreSQL au lancement de l'application.
 - En test, **Testcontainers** démarre un PostgreSQL 18 (`TestcontainersConfiguration`) : Docker est nécessaire.

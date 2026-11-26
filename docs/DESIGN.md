@@ -24,6 +24,33 @@ Les règles marquées **(à valider)** sont des propositions de l'équipe qui at
 Les objets du domaine sont des classes Java simples (records pour les objets valeur). Les entités JPA vivent dans
 `infrastructure/persistance` et sont converties vers ou depuis le domaine par l'adaptateur du dépôt.
 
+### Importer un cours (UC2)
+
+- Ordre : titre, écriture dans un fichier temporaire (taille réelle et SHA-256), analyse du PDF, doublon, rangement,
+  enregistrement, action sensible `cours_importe`. Le fichier temporaire est supprimé dans tous les cas.
+- Tout ou rien : une transaction annulée supprime le fichier rangé. Si l'issue de la validation est inconnue, le
+  fichier est gardé et sera traité comme orphelin.
+- Doublon : même empreinte dans un cours **non archivé** du même enseignant. Les imports d'un enseignant passent l'un
+  après l'autre (ligne verrouillée), pour qu'un double clic ne crée pas deux cours. Le refus n'est tracé que dans les
+  logs (`import_refuse_doublon`).
+- PDF refusé : signature `%PDF-` absente du début (415) ; corrompu, sans page ou **chiffré**, même sans mot de passe
+  d'ouverture (422) *(à valider)*.
+- Le nom d'origine du fichier est gardé pour l'affichage, sans dossier. Ni lui, ni le titre, ni le contenu du
+  fichier n'apparaissent dans les logs d'un import réussi, et les logs de PDFBox sont coupés. Seul le message du
+  doublon, qui cite le titre du cours existant, est journalisé.
+- Classes : `CoursImporte` et `VersionImportee` (dossier : `Cours` et `VersionCours`).
+
+### Lister et ouvrir ses cours (E2, E3)
+
+- Un enseignant ne lit que ses propres cours. Un cours inconnu ou d'un autre enseignant répond le même 404 : son
+  existence n'est pas révélée.
+- Un cours archivé n'est plus listé. Son propriétaire peut encore l'ouvrir : la réponse porte `archive` à vrai et
+  l'éditeur le montre en lecture seule.
+- La liste présente le cours modifié le plus récemment en premier, à date égale le dernier créé *(à valider)*.
+- La dernière version est celle de numéro le plus élevé. Le nombre de quiz est celui des quiz non archivés du cours.
+- Lecture directe en SQL dans le modèle `CoursConsulte` (une requête, quel que soit le nombre de cours) : ces écrans
+  n'appliquent aucune règle de modification.
+
 ## 2. Types de questions
 
 | Type | Priorité | Saisie enseignant | Réponse étudiant | Validité minimale |
@@ -120,6 +147,28 @@ Règles :
    `delai_passage_auto_sec`.
 7. À la clôture de la séance, le code d'accès et les jetons de participants sont invalidés.
 
+### Lancer et dérouler une séance (UC7)
+
+- Lancement tout ou rien, dans une transaction : propriété du quiz, quiz prêt, aucune autre séance ouverte (la ligne
+  de l'enseignant est verrouillée), annuaire pour un quiz noté, séance, QR code, canal temps réel, puis action
+  sensible `quiz_lance`. Un refus n'est tracé que dans les logs.
+- La séance présente la dernière version du cours. Ses questions sont les pages de quiz de cette version, triées par
+  page du PDF puis par ordre ; `position_courante` est le rang de la page. L'UC9 retrouve la question ouverte de la
+  même façon : les deux lectures doivent rester d'accord.
+- « Prêt » : au moins une question, et pour chacune un énoncé, une durée et ses réponses attendues (§2). La question
+  est revérifiée à son ouverture.
+- Code d'accès : 16 octets tirés par `SecureRandom`, en Base64url (22 caractères). Il n'apparaît pas dans les logs
+  métier ni dans `journal_evenement`.
+- Une question est **ouverte** quand la séance est `EN_COURS` et qu'`echeance_question` est fixée ; la clore efface
+  l'échéance. La clôture automatique part à l'échéance plus 250 ms, et les échéances en cours sont reprogrammées au
+  redémarrage du serveur. Les écrans et le passage automatique en attente sont perdus à un redémarrage.
+- Quiz noté sans annuaire : l'autorisation de l'enseignant est gardée dans
+  `session_quiz.identite_non_verifiee_autorisee`.
+- Résultat envoyé à chaque étudiant à la clôture : points, score, rang (score, puis temps cumulé, puis arrivée) et
+  évolution. Le classement projeté relève de la feature `classement`.
+- Choix **à valider** : délai du passage automatique non réglé = 5 s ; terminer la séance pendant une question la
+  clôt et publie sa correction.
+
 ### Rejoindre une séance
 
 | Mode | Étapes | Règles |
@@ -128,6 +177,14 @@ Règles :
 | Noté | Lien ou QR code → identifiant + mot de passe IUT → entrer | Rôle étudiant exigé ; un pseudonyme d'affichage est proposé ; une nouvelle connexion du même compte remplace la précédente. |
 | Noté, annuaire indisponible | L'enseignant autorise l'entrée « identité non vérifiée » | Nom et identifiant saisis, `identite_verifiee = false`, signalés dans les résultats et l'export. |
 
+- Pseudonyme : nettoyé avant tout contrôle (normalisation Unicode NFC, suites d'espaces réduites à une, espaces de
+  début et de fin retirés), puis 2 à 20 caractères sans caractère de contrôle. L'unicité se compare à l'identique,
+  comme la contrainte `uq_participant_pseudonyme` : `Alice` et `alice` sont deux pseudonymes **(à valider)**. Le
+  pseudonyme proposé ajoute 2, 3, 4… à la fin (`Alice2`) en restant à 20 caractères.
+- Jeton de participant : 32 octets tirés par `SecureRandom`, encodés en Base64url (43 caractères) ; seule son
+  empreinte SHA-256 (64 caractères hexadécimaux minuscules) est stockée dans `participant.jeton_reconnexion`.
+- Entrée tout ou rien : le participant est enregistré dans une transaction, l'écriture est forcée, et le nombre de
+  connectés n'est diffusé à l'enseignant qu'après le commit.
 - Arrivée en retard : le participant rejoint la question en cours, sans points pour les questions manquées.
 - Coupure réseau : le front renvoie son jeton de reconnexion ; le participant retrouve la question en cours et ses
   réponses déjà confirmées.
@@ -249,6 +306,11 @@ La règle exacte de repérage (taille du repère, tolérance) est à confirmer p
 
 - Utiliser le port `JournalEvenements` dans les cas d'usage, jamais un logger directement.
 - Jamais de nom, de pseudonyme, d'e-mail, de mot de passe, de texte de réponse ni de contenu de fichier dans les logs.
+  Ni de jeton de participant, ni d'empreinte de jeton. Les objets de l'UC8 qui portent ces valeurs
+  (`Pseudonyme`, `ParticipantEntrant`, DTO) masquent leur contenu dans `toString()`.
+- Hibernate recopie les valeurs d'une violation de contrainte PostgreSQL dans ses logs (`Key (id_session,
+  pseudonyme)=(3, Alice) already exists`) : le logger `org.hibernate.orm.jdbc.error` est coupé dans
+  `application.properties`. L'exception reste levée et traduite par `GestionnaireErreurs`, sans valeur.
 - `actionSensible` pour : connexion, import, suppression, archivage, lancement de séance, correction, export.
 
 ### Tests

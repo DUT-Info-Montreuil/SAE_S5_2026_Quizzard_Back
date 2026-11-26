@@ -5,7 +5,9 @@ Le back-end utilise **PostgreSQL 18**. Le schéma est créé et versionné **uni
 (`spring.jpa.hibernate.ddl-auto=validate`).
 
 Source du schéma : dossier de conception et d'architecture technique, §3.2 (MLD, 20 tables) et §3.2.3 (dictionnaire
-des données). Migration actuelle : [`V1__schema_initial.sql`](../src/main/resources/db/migration/V1__schema_initial.sql).
+des données). Migrations : [`V1__schema_initial.sql`](../src/main/resources/db/migration/V1__schema_initial.sql),
+[`V2__page_inseree_position_differee.sql`](../src/main/resources/db/migration/V2__page_inseree_position_differee.sql)
+(UC3 : contrainte de position des pages vérifiée en fin de transaction).
 
 ---
 
@@ -82,7 +84,7 @@ erDiagram
 |---|---|---|
 | `enseignant` | Compte enseignant ou administrateur | `identifiant_ldap` unique ; `origine_compte` `LDAP` ou `LOCAL` ; `role` `ENSEIGNANT` ou `ADMINISTRATEUR` ; `mot_de_passe_hash` (BCrypt) **seulement** pour un compte `LOCAL` (`ck_enseignant_mot_de_passe`). |
 | `cours` | Cours d'un enseignant | `titre` non vide ; `archive` ; `date_modification` mise à jour à chaque changement. |
-| `version_cours` | Une version importée du PDF | `numero` ≥ 1, unique par cours ; `empreinte` SHA-256 (64 caractères hexadécimaux) pour détecter les doublons ; `chemin_stockage` NULL **si et seulement si** `date_suppression_fichier` est renseignée (fichier supprimé par l'administrateur). |
+| `version_cours` | Une version importée du PDF | `numero` ≥ 1, unique par cours ; `empreinte` SHA-256 (64 caractères hexadécimaux) pour détecter les doublons ; `chemin_stockage` relatif au dossier de stockage (`cours/<UUID>.pdf`, UC2), NULL **si et seulement si** `date_suppression_fichier` est renseignée (fichier supprimé par l'administrateur). |
 | `quiz` | Quiz rattaché au cours (pas à une version) | `est_note` ; `duree_par_defaut_sec` > 0 ; `passage_automatique` + `delai_passage_auto_sec` ; `affichage_cours` `PROJETE_SEUL` ou `AUSSI_ETUDIANTS` (point ouvert n° 8 du cahier des charges). |
 | `classement` | Classement d'un enseignant | `nom` unique par enseignant. |
 | `classement_quiz` | Quiz reliés à un classement | Clé primaire composée ; un classement cumulé relie plusieurs quiz, éventuellement de cours différents. |
@@ -102,13 +104,13 @@ erDiagram
 
 | Table | Rôle | Points clés |
 |---|---|---|
-| `page_inseree` | Page de quiz ou de classement intercalée dans une version du cours | Ancrée par `numero_page` (0 = avant la première page) + `repere_texte` + `ordre` (plusieurs pages au même endroit) ; **soit** `id_question` **soit** `id_classement` (`num_nonnulls = 1`) ; une question n'apparaît qu'une fois par version ; `valide` = position confirmée par l'enseignant après réapplication (UC6). |
+| `page_inseree` | Page de quiz ou de classement intercalée dans une version du cours | Ancrée par `numero_page` (0 = avant la première page) + `repere_texte` + `ordre` (plusieurs pages au même endroit) ; **soit** `id_question` **soit** `id_classement` (`num_nonnulls = 1`) ; une question n'apparaît qu'une fois par version ; `uq_page_inseree_position` est `DEFERRABLE INITIALLY DEFERRED` (V2), pour décaler les rangs (`ordre = ordre + 1`) dans la transaction d'insertion (UC3) ; `valide` = position confirmée par l'enseignant après réapplication (UC6). |
 
 ### 4.4 Séances et résultats
 
 | Table | Rôle | Points clés |
 |---|---|---|
-| `session_quiz` | Une séance (un quiz joué en direct) | `code_acces` unique (lien et QR code) ; `etat` `PREPAREE` → `EN_COURS` → `CLOTUREE` ; `est_notee` figé au lancement ; `position_courante` et `echeance_question` (horloge serveur) ; liée à la version du cours projetée. |
+| `session_quiz` | Une séance (un quiz joué en direct) | `code_acces` unique (lien et QR code) ; `etat` `PREPAREE` → `EN_COURS` → `CLOTUREE` ; `est_notee` figé au lancement ; `position_courante` (rang de la page de quiz dans la version) et `echeance_question` (horloge serveur, nulle quand aucune question n'est ouverte) ; liée à la version du cours projetée ; `identite_non_verifiee_autorisee` (migration `V3__session_identite_non_verifiee.sql`, UC7) : l'enseignant accepte les entrées non vérifiées d'un quiz noté quand l'annuaire ne répond pas. |
 | `participant` | Étudiant dans une séance | `pseudonyme` 2 à 20 caractères, unique dans la séance ; identité (`identifiant_ldap`, `nom`, `prenom`) **seulement en quiz noté** ; `identite_verifiee` faux pour une entrée « identité non vérifiée » ; `score_total` ; `jeton_reconnexion` unique sur 64 caractères (recommandation : y ranger l'empreinte SHA-256 du jeton plutôt que le jeton en clair) ; `derniere_activite`. Cascade depuis la séance. |
 | `reponse` | Réponse d'un participant à une question | **Une seule** par participant et par question (`uq_reponse_participant_question`) ; `horodatage_serveur`, `temps_reponse_ms` ; `points_calcules` (au moment de la réponse) et `points_finaux` (après correction) ; `statut_correction` `SANS_OBJET`, `ACCEPTEE_PAR_MOTIF`, `A_EXAMINER`, `VALIDEE`, `REFUSEE`. |
 | `reponse_choix` | Propositions cochées (QCM) | Clé primaire `(id_reponse, id_proposition)`. |
