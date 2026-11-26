@@ -100,7 +100,8 @@ class ConsultationCoursWebTest {
         Map<String, Object> ouvert = JsonPath.read(
                 corps(ouvrir(enseignant, idCours).andExpect(status().isOk())), "$");
         assertThat(ouvert).containsAllEntriesOf(cours).containsEntry("idVersion", idVersion)
-                .hasSize(cours.size() + 1);
+                .containsEntry("archive", false)
+                .hasSize(cours.size() + 2);
     }
 
     @Test
@@ -156,12 +157,24 @@ class ConsultationCoursWebTest {
     }
 
     @Test
-    void un_cours_inconnu_archive_ou_d_un_autre_enseignant_repond_le_meme_404() throws Exception {
+    void un_cours_archive_s_ouvre_pour_son_proprietaire_avec_archive_a_vrai() throws Exception {
         Long archive = cours(enseignant, DATE);
         fixtures.archiver(archive);
-        Long autrui = cours(fixtures.creerEnseignant(), DATE);
 
-        for (long idCours : new long[] {999_999_999L, archive, autrui}) {
+        ouvrir(enseignant, archive)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.idCours").value(archive.intValue()))
+                .andExpect(jsonPath("$.archive").value(true));
+    }
+
+    @Test
+    void un_cours_inconnu_ou_d_un_autre_enseignant_repond_le_meme_404() throws Exception {
+        Long autrui = cours(fixtures.creerEnseignant(), DATE);
+        // Archivé ou non, le cours d'un autre enseignant ne se révèle pas.
+        Long archiveDAutrui = cours(fixtures.creerEnseignant(), DATE);
+        fixtures.archiver(archiveDAutrui);
+
+        for (long idCours : new long[] {999_999_999L, autrui, archiveDAutrui}) {
             ouvrir(enseignant, idCours)
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.code").value("COURS_INTROUVABLE"))

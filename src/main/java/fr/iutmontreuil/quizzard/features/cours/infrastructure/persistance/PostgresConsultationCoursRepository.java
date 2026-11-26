@@ -19,14 +19,14 @@ import fr.iutmontreuil.quizzard.features.cours.application.port.ConsultationCour
 @Repository
 class PostgresConsultationCoursRepository implements ConsultationCoursRepository {
 
-    /** Cours non archivés d'un enseignant ; un cours a toujours au moins une version (UC2). */
+    /** Cours d'un enseignant, archivés compris ; un cours a toujours au moins une version (UC2). */
     private static final String COURS_DE_L_ENSEIGNANT = """
-            SELECT c.id_cours, c.titre, c.date_modification, v.id_version, v.numero, v.nb_pages,
+            SELECT c.id_cours, c.titre, c.date_modification, c.archive, v.id_version, v.numero, v.nb_pages,
                    (SELECT count(*) FROM quiz q WHERE q.id_cours = c.id_cours AND NOT q.archive) AS nb_quiz
               FROM cours c
               JOIN LATERAL (SELECT id_version, numero, nb_pages FROM version_cours
                              WHERE id_cours = c.id_cours ORDER BY numero DESC LIMIT 1) v ON TRUE
-             WHERE c.id_enseignant = :idEnseignant AND NOT c.archive
+             WHERE c.id_enseignant = :idEnseignant
             """;
 
     private final JdbcClient jdbc;
@@ -37,7 +37,8 @@ class PostgresConsultationCoursRepository implements ConsultationCoursRepository
 
     @Override
     public List<CoursConsulte> listerParEnseignant(Long idEnseignant) {
-        return jdbc.sql(COURS_DE_L_ENSEIGNANT + " ORDER BY c.date_modification DESC, c.id_cours DESC")
+        return jdbc.sql(COURS_DE_L_ENSEIGNANT
+                        + " AND NOT c.archive ORDER BY c.date_modification DESC, c.id_cours DESC")
                 .param("idEnseignant", idEnseignant)
                 .query((ligne, i) -> versCours(ligne))
                 .list();
@@ -55,6 +56,6 @@ class PostgresConsultationCoursRepository implements ConsultationCoursRepository
     private static CoursConsulte versCours(ResultSet ligne) throws SQLException {
         return new CoursConsulte(ligne.getLong("id_cours"), ligne.getString("titre"), ligne.getLong("id_version"),
                 ligne.getInt("numero"), ligne.getInt("nb_pages"), ligne.getInt("nb_quiz"),
-                ligne.getObject("date_modification", LocalDateTime.class));
+                ligne.getObject("date_modification", LocalDateTime.class), ligne.getBoolean("archive"));
     }
 }

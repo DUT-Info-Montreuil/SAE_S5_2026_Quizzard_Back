@@ -42,8 +42,10 @@ Les objets du domaine sont des classes Java simples (records pour les objets val
 
 ### Lister et ouvrir ses cours (E2, E3)
 
-- Un enseignant ne lit que ses cours non archivés. Un cours inconnu, archivé ou d'un autre enseignant répond le même
-  404 : son existence n'est pas révélée.
+- Un enseignant ne lit que ses propres cours. Un cours inconnu ou d'un autre enseignant répond le même 404 : son
+  existence n'est pas révélée.
+- Un cours archivé n'est plus listé. Son propriétaire peut encore l'ouvrir : la réponse porte `archive` à vrai et
+  l'éditeur le montre en lecture seule.
 - La liste présente le cours modifié le plus récemment en premier, à date égale le dernier créé *(à valider)*.
 - La dernière version est celle de numéro le plus élevé. Le nombre de quiz est celui des quiz non archivés du cours.
 - Lecture directe en SQL dans le modèle `CoursConsulte` (une requête, quel que soit le nombre de cours) : ces écrans

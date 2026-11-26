@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
  * @param nbPages          pages du PDF de cette version
  * @param nbQuiz           quiz non archivés du cours ; un quiz appartient au cours, pas à une version
  * @param dateModification dernière modification du cours
+ * @param archive          vrai si le cours est archivé : il s'ouvre en lecture seule et n'est plus listé
  */
 public record CoursConsulte(
         Long idCours,
@@ -19,7 +20,8 @@ public record CoursConsulte(
         int numeroVersion,
         int nbPages,
         int nbQuiz,
-        LocalDateTime dateModification) {
+        LocalDateTime dateModification,
+        boolean archive) {
 
     @Override
     public String toString() {

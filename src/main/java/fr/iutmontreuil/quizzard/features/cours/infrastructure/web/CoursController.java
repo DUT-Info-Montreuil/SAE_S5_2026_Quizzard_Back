@@ -51,7 +51,7 @@ class CoursController {
         return listerCours.executer(enseignant.idEnseignant()).stream().map(CoursMapper::versReponse).toList();
     }
 
-    /** {@code 200} avec le cours et sa dernière version. */
+    /** {@code 200} avec le cours et sa dernière version, y compris s'il est archivé ({@code archive}). */
     @GetMapping("/api/cours/{idCours}")
     CoursOuvertResponse ouvrir(@PathVariable Long idCours) {
         return CoursMapper.versReponseOuverte(ouvrirCours.executer(idCours, enseignant.idEnseignant()));

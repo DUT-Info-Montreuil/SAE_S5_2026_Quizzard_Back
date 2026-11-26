@@ -138,8 +138,8 @@ annoncé. Le fichier est rangé sous un nom tiré au hasard, dans un dossier qu'
 le serveur coupe la connexion au lieu de répondre `413` : le front contrôle la taille avant d'envoyer.
 
 **Fait (UC2) : `GET /api/cours` et `GET /api/cours/{idCours}`**, liste « Mes cours » (écran E2) et bouton
-« Ouvrir ». Enseignant connecté ; il ne voit que ses cours **non archivés** (un cours archivé par l'administrateur,
-UC20, est retiré de son espace).
+« Ouvrir ». Enseignant connecté ; il ne voit que ses propres cours. Un cours archivé (par l'administrateur, UC20)
+n'est **plus listé**, mais son propriétaire peut encore l'**ouvrir**, en lecture seule.
 
 `GET /api/cours` → `200`, un tableau sans enveloppe (vide s'il n'a pas de cours), chaque élément ayant la forme de la
 réponse de l'import, le cours modifié le plus récemment en premier *(à valider)* :
@@ -150,11 +150,12 @@ réponse de l'import, le cours modifié le plus récemment en premier *(à valid
 ```
 
 `GET /api/cours/{idCours}` → `200`, les mêmes champs plus `idVersion`, la dernière version : celle que l'éditeur (E3)
-ouvre, où insérer une page (UC3) et sur laquelle lancer un quiz (UC7) :
+ouvre, où insérer une page (UC3) et sur laquelle lancer un quiz (UC7) ; et `archive` (booléen) : s'il vaut `true`, le
+front ouvre l'éditeur en lecture seule :
 
 ```json
 { "idCours": 4, "titre": "Réseaux", "idVersion": 9, "numeroVersion": 1, "nbPages": 12, "nbQuiz": 0,
-  "dateModification": "2026-11-25T14:00:00" }
+  "dateModification": "2026-11-25T14:00:00", "archive": false }
 ```
 
 `numeroVersion` et `nbPages` (pages du PDF) sont ceux de la dernière version. `nbQuiz` compte les quiz non archivés
@@ -164,7 +165,7 @@ du cours : un quiz appartient au cours, pas à une version. `dateModification` e
 |---|---|---|---|
 | Pas connecté | `401` | — | Vous devez être connecté. |
 | `idCours` qui n'est pas un nombre | `400` | — | La requête est mal formée. |
-| Cours inexistant, archivé ou d'un autre enseignant | `404` | `COURS_INTROUVABLE` | Cours introuvable. |
+| Cours inexistant ou d'un autre enseignant | `404` | `COURS_INTROUVABLE` | Cours introuvable. |
 
 | Méthode | Route | Accès | Prio | Description |
 |---|---|---|---|---|

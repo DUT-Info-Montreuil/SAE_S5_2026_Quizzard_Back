@@ -18,7 +18,7 @@ class ConsultationCoursUseCaseTest {
 
     private static final Long PROPRIETAIRE = 7L;
     private static final CoursConsulte COURS = new CoursConsulte(11L, "Réseaux", 21L, 1, 12, 0,
-            LocalDateTime.of(2026, 11, 25, 14, 0));
+            LocalDateTime.of(2026, 11, 25, 14, 0), false);
 
     /** Doublure en mémoire : un seul cours, celui de {@link #PROPRIETAIRE}. */
     private final ConsultationCoursRepository depot = new ConsultationCoursRepository() {

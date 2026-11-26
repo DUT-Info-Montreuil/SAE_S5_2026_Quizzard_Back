@@ -25,6 +25,6 @@ final class CoursMapper {
 
     static CoursOuvertResponse versReponseOuverte(CoursConsulte cours) {
         return new CoursOuvertResponse(cours.idCours(), cours.titre(), cours.idVersion(), cours.numeroVersion(),
-                cours.nbPages(), cours.nbQuiz(), cours.dateModification());
+                cours.nbPages(), cours.nbQuiz(), cours.dateModification(), cours.archive());
     }
 }

@@ -31,7 +31,7 @@ Hors périmètre : nouvelle version d'un cours (UC6), insertion de quiz (UC3), l
 | D7 | Fichiers rangés dans `STOCKAGE_DOSSIER` (par défaut `stockage/`, ignoré par Git), sous `cours/<UUID>.pdf`. |
 | D8 | Liste et ouverture lisent un modèle `CoursConsulte` par un port à part (`ConsultationCoursRepository`), en une requête SQL : ni conflit avec le `CoursRepository` de l'UC3, ni nouvelle entité. |
 | D9 | `CoursIntrouvableException` copiée à l'identique de l'UC3 : même `404 COURS_INTROUVABLE`. |
-| D10 | Un cours archivé n'est ni listé ni ouvrable (`404`) : le dossier le dit « retiré de l'espace de l'enseignant » (UC20). |
+| D10 | Un cours archivé n'est plus listé (le dossier le dit « retiré de l'espace de l'enseignant », UC20), mais son propriétaire peut l'ouvrir : `archive` vaut vrai et l'éditeur E3 est en lecture seule. Remplace la première décision, qui répondait `404` à l'ouverture. |
 
 ## 3. Contrat
 
@@ -49,7 +49,7 @@ dateModification}`.
 | Route | Succès (`200`) |
 |---|---|
 | `GET /api/cours` | Tableau des cours non archivés de l'enseignant, même forme que ci-dessus, modifiés récemment d'abord |
-| `GET /api/cours/{idCours}` | Les mêmes champs plus `idVersion` (dernière version) |
+| `GET /api/cours/{idCours}` | Les mêmes champs plus `idVersion` (dernière version) et `archive` (booléen), y compris pour un cours archivé |
 
 `nbQuiz` : quiz non archivés du cours. Détail dans `docs/API.md` §3.2.
 
@@ -66,7 +66,7 @@ dateModification}`.
 | PDF corrompu, chiffré ou sans page | `422` | `PDF_ILLISIBLE` | « Le PDF est illisible ou protégé par un mot de passe. » |
 | Doublon non confirmé | `409` | `DOUBLON_COURS` | « Vous avez déjà importé ce PDF dans le cours « … ». Importer quand même ? » |
 | Écriture sur le disque ou en base en panne | `500` | — | Message générique ; rien n'est créé |
-| Ouverture d'un cours inconnu, archivé ou d'un autre enseignant | `404` | `COURS_INTROUVABLE` | « Cours introuvable. » |
+| Ouverture d'un cours inconnu ou d'un autre enseignant | `404` | `COURS_INTROUVABLE` | « Cours introuvable. » |
 
 ## 5. Machine à états d'un import
 
@@ -131,7 +131,8 @@ L'UC2 n'ajoute aucun conflit. Les seuls conflits de la fusion simulée existent 
 | F1 | Le titre est obligatoire (l'ancien `docs/API.md` le disait facultatif) : le proposer à partir du nom du fichier |
 | F2 | Sur `409 DOUBLON_COURS`, renvoyer le même fichier avec `confirmerDoublon=true` |
 | F3 | Contrôler la taille avant l'envoi : au-delà de 100 Mo, la connexion est coupée sans réponse |
-| F4 | L'ouverture répond à plat (`idVersion` à côté de `numeroVersion`) : le lecteur de la liste suffit, avec un champ de plus |
+| F4 | L'ouverture répond à plat (`idVersion` à côté de `numeroVersion`) : le lecteur de la liste suffit, avec deux champs de plus (`idVersion`, `archive`) |
+| F5 | Si `archive` vaut vrai, ouvrir E3 en lecture seule |
 
 ### À valider avec le client
 
@@ -147,6 +148,8 @@ L'UC2 n'ajoute aucun conflit. Les seuls conflits de la fusion simulée existent 
 - Une contrainte de base violée répond `409` (règle commune), pas `500`.
 - Le message du doublon cite le titre du cours existant, comme le demande le dossier : le gestionnaire commun l'écrit
   aussi dans les logs.
+- Un cours archivé reste ouvrable par son propriétaire, en lecture seule, alors que le dossier le dit retiré de son
+  espace.
 
 ### Pas encore fait
 
@@ -160,5 +163,5 @@ L'UC2 n'ajoute aucun conflit. Les seuls conflits de la fusion simulée existent 
 - [x] Le fichier est hors de l'espace public et ne reste pas en double.
 - [x] Ni titre, ni nom de fichier, ni contenu de fichier dans les logs d'un import réussi.
 - [x] Le cours importé apparaît dans la liste, avec la forme de la réponse de l'import.
-- [x] Un enseignant ne liste et n'ouvre que ses cours non archivés.
+- [ ] Un enseignant ne liste que ses cours non archivés ; il n'ouvre que les siens, archivés compris (`archive`).
 - [x] `./mvnw verify` passe, sur la branche et après fusion simulée.
