@@ -231,6 +231,7 @@ L'interrupteur `SECURITE_OUVERTE` (fichier `.env`) ouvre toutes les routes pour 
 |---|---|---|
 | `DB_NAME`, `DB_USER`, `DB_PASSWORD` | `quizzard` | Base PostgreSQL de développement (`compose.yaml`) |
 | `DB_PORT` | `5433` | Port côté machine (le 5432 est souvent déjà pris) |
+| `STOCKAGE_DOSSIER` | `stockage` | Dossier des PDF importés (UC2), servi par aucune route ; un volume sauvegardé en production |
 | `FRONT_URL` | `http://localhost:5173` | Origine autorisée par CORS |
 | `SECURITE_OUVERTE` | `false` | Développement uniquement |
 | `LDAP_URL` | vide | Annuaire de l'IUT en `ldaps://`, lu au lancement d'un quiz noté (UC7). Vide : annuaire indisponible |

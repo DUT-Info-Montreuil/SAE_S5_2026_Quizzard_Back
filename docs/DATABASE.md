@@ -82,7 +82,7 @@ erDiagram
 |---|---|---|
 | `enseignant` | Compte enseignant ou administrateur | `identifiant_ldap` unique ; `origine_compte` `LDAP` ou `LOCAL` ; `role` `ENSEIGNANT` ou `ADMINISTRATEUR` ; `mot_de_passe_hash` (BCrypt) **seulement** pour un compte `LOCAL` (`ck_enseignant_mot_de_passe`). |
 | `cours` | Cours d'un enseignant | `titre` non vide ; `archive` ; `date_modification` mise à jour à chaque changement. |
-| `version_cours` | Une version importée du PDF | `numero` ≥ 1, unique par cours ; `empreinte` SHA-256 (64 caractères hexadécimaux) pour détecter les doublons ; `chemin_stockage` NULL **si et seulement si** `date_suppression_fichier` est renseignée (fichier supprimé par l'administrateur). |
+| `version_cours` | Une version importée du PDF | `numero` ≥ 1, unique par cours ; `empreinte` SHA-256 (64 caractères hexadécimaux) pour détecter les doublons ; `chemin_stockage` relatif au dossier de stockage (`cours/<UUID>.pdf`, UC2), NULL **si et seulement si** `date_suppression_fichier` est renseignée (fichier supprimé par l'administrateur). |
 | `quiz` | Quiz rattaché au cours (pas à une version) | `est_note` ; `duree_par_defaut_sec` > 0 ; `passage_automatique` + `delai_passage_auto_sec` ; `affichage_cours` `PROJETE_SEUL` ou `AUSSI_ETUDIANTS` (point ouvert n° 8 du cahier des charges). |
 | `classement` | Classement d'un enseignant | `nom` unique par enseignant. |
 | `classement_quiz` | Quiz reliés à un classement | Clé primaire composée ; un classement cumulé relie plusieurs quiz, éventuellement de cours différents. |
