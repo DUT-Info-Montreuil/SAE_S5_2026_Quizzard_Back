@@ -2,10 +2,10 @@
 
 Contrat entre le back-end Spring Boot et le front React : routes REST et canal temps réel (WebSocket/STOMP).
 
-> **État actuel** : seul le socle existe (`GET /actuator/health`, format d'erreur, sécurité, CORS). Les routes
-> ci-dessous sont la **cible** proposée pour les features ; elles sont marquées par leur cas d'utilisation (UC) et
-> leur priorité. Toute route ajoutée, renommée ou supprimée doit être reportée ici dans la même pull request, et
-> annoncée à l'équipe front. La documentation Swagger/OpenAPI générée depuis le code (exigée à la soutenance 2)
+> **État actuel** : le socle (`GET /actuator/health`, format d'erreur, sécurité, CORS) et l'UC8 « Rejoindre un
+> quiz » (§2). Les autres routes ci-dessous sont la **cible** proposée pour les features ; elles sont marquées par
+> leur cas d'utilisation (UC) et leur priorité. Toute route ajoutée, renommée ou supprimée doit être reportée ici
+> dans la même pull request, et annoncée à l'équipe front. La documentation Swagger/OpenAPI générée depuis le code (exigée à la soutenance 2)
 > deviendra la référence détaillée des schémas ; ce fichier garde la vue d'ensemble.
 
 ---
@@ -89,6 +89,39 @@ suffit pas à choisir le message (plusieurs causes de 409, par exemple). Sans co
 | Méthode | Route | Accès | Description |
 |---|---|---|---|
 | `GET` | `/actuator/health` | Public | Santé de l'application (sonde du reverse proxy et de Docker) |
+| `GET` | `/api/public/sessions/{codeAcces}` | Public | UC8. Ouverture du lien ou du QR code (écran E7) : `200` `{titreCours, titreQuiz, estNotee, etat}` avec `etat` = `PREPAREE` ou `EN_COURS` ; `404` code inconnu ; `409` séance close. Si `estNotee` est vrai, le front propose la connexion avec le compte IUT |
+| `POST` | `/api/public/sessions/{codeAcces}/participants` | Public | UC8. Entrer dans la séance avec un pseudonyme `{pseudonyme}` (écran E7). `201` `{idParticipant, jeton, pseudonyme}` avec `Cache-Control: no-store` ; `400` corps illisible, ou pseudonyme absent ou hors taille (`REQUETE_INVALIDE`, `champs.pseudonyme`) ; `404` code inconnu ; `409` séance close, quiz noté (« connecte-toi avec ton compte IUT ») ou pseudonyme pris (champ `suggestion`) ; `422` pseudonyme refusé après nettoyage (`champs.pseudonyme`) |
+
+#### Rejoindre un quiz (UC8)
+
+- **Pseudonyme** : nettoyé par le serveur (espaces de début et de fin retirés, suites d'espaces réduites à une,
+  normalisation Unicode NFC), puis 2 à 20 caractères, sans caractère de contrôle. Le pseudonyme **retenu** est celui
+  de la réponse (`Alice` pour `"  Alice  "`). L'unicité est vérifiée dans la séance, à l'identique :
+  `Alice` et `alice` sont deux pseudonymes *(à valider avec le client)*.
+- **Suggestion** : en cas de doublon, le serveur ajoute 2, 3, 4… à la fin (`Alice2`), en raccourcissant pour rester
+  à 20 caractères. Si deux étudiants envoient le même pseudonyme au même instant, le second reçoit le même `409`
+  sans `suggestion` : le front redemande un pseudonyme.
+- **Jeton** : 43 caractères (Base64url). Le serveur n'en garde que l'empreinte SHA-256 : il est remis **une seule
+  fois**, et la réponse qui le porte n'est jamais mise en cache (`Cache-Control: no-store`). Le front le garde pour ce
+  code d'accès, l'envoie ensuite dans `X-Jeton-Participant` et dans la trame STOMP `CONNECT`, puis lit l'état par
+  `GET /api/public/sessions/{codeAcces}/etat` *(UC9)* : la question en cours si le quiz a déjà commencé, sinon
+  l'attente de la première question.
+- **Temps réel** : une fois l'entrée validée, le serveur pousse `{nombre}` sur
+  `/topic/sessions/{codeAcces}/connectes` (compteur de l'écran E5). Une entrée refusée ne pousse rien. La poignée de
+  main `/ws` est publique ; le contrôle du jeton à la connexion STOMP et des abonnements arrive avec l'UC9.
+- **Format du code d'accès** : 32 caractères au plus, lu dans l'adresse ; il est secret tant que la séance dure.
+- **Messages d'erreur** : tutoyés, sans pseudonyme, jeton ni code d'accès.
+
+Un conflit (409) qui sait proposer une valeur de remplacement ajoute `suggestion` (aujourd'hui : un pseudonyme libre
+quand celui qui est demandé est déjà pris). Le champ est absent quand il n'y a rien à proposer :
+
+```json
+{
+  "error": "Ce pseudonyme est déjà pris. Essaie celui qui t'est proposé.",
+  "request_id": "…",
+  "suggestion": "Alice2"
+}
+```
 
 ## 3. Routes REST prévues
 
@@ -174,8 +207,8 @@ Pour `POINTS_A_RELIER`, `propositions` est remplacé par `paires: [{gauche, droi
 
 | Méthode | Route | Accès | Prio | Description |
 |---|---|---|---|---|
-| `GET` | `/api/public/sessions/{codeAcces}` | Public | M | Titre du cours et du quiz, mode noté, état ; `404` code inconnu ; `409` séance close |
-| `POST` | `/api/public/sessions/{codeAcces}/participants` | Public | M | Rejoindre sans compte `{pseudonyme}` → `201` `{idParticipant, jeton, pseudonyme}` ; `409` pseudonyme pris (avec suggestion) |
+| `GET` | `/api/public/sessions/{codeAcces}` | Public | M | **Fait (§2).** Titre du cours et du quiz, mode noté, état ; `404` code inconnu ; `409` séance close |
+| `POST` | `/api/public/sessions/{codeAcces}/participants` | Public | M | **Fait (§2).** Rejoindre sans compte `{pseudonyme}` → `201` `{idParticipant, jeton, pseudonyme}` ; `409` séance close, quiz noté ou pseudonyme pris (avec `suggestion`) ; `400` / `422` pseudonyme invalide |
 | `POST` | `/api/public/sessions/{codeAcces}/participants/ldap` | Public | S | Rejoindre un quiz noté `{identifiant, motDePasse, pseudonyme?}` → `201` ; `401` message générique |
 | `POST` | `/api/public/sessions/{codeAcces}/reconnexion` | Étu. | M | Reprendre après une coupure → état courant + score |
 | `GET` | `/api/public/sessions/{codeAcces}/etat` | Étu. | M | **Fait (UC9).** Question ouverte **sans réponses attendues**, déjà répondu, score (voir ci-dessous) ; `401` `JETON_INVALIDE` |
