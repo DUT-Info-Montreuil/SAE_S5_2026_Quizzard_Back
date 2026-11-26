@@ -21,6 +21,7 @@ import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
@@ -91,7 +92,18 @@ class SocleWebTest {
         mvc.perform(get("/test/panne"))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.error").value("Une erreur est survenue. Réessayez dans un instant."))
+                .andExpect(jsonPath("$.code").value("ERREUR_SERVEUR"))
                 .andExpect(content().string(not(containsString("secret-technique"))));
+    }
+
+    @Test
+    @WithMockUser
+    void une_contrainte_de_base_violee_renvoie_500_erreur_serveur_sans_detail() throws Exception {
+        mvc.perform(get("/test/contrainte"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.code").value("ERREUR_SERVEUR"))
+                .andExpect(jsonPath("$.error").value("Une erreur est survenue. Réessayez dans un instant."))
+                .andExpect(content().string(not(containsString("valeur-en-double"))));
     }
 
     @Test
@@ -231,6 +243,11 @@ class SocleWebTest {
         @GetMapping("/test/invalide")
         void invalide() {
             throw new TitreInvalide();
+        }
+
+        @GetMapping("/test/contrainte")
+        void contrainte() {
+            throw new DataIntegrityViolationException("duplicate key value valeur-en-double");
         }
 
         @GetMapping("/test/panne")

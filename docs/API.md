@@ -48,7 +48,7 @@ Contrat entre le back-end Spring Boot et le front React : routes REST et canal t
 | `413 Payload Too Large` | Fichier de plus de 50 Mo |
 | `415 Unsupported Media Type` | Fichier qui n'est pas un PDF ou une image acceptée |
 | `422 Unprocessable Entity` | Données bien formées refusées par une règle métier |
-| `500 Internal Server Error` | Erreur imprévue (message générique, détail seulement dans les logs) |
+| `500 Internal Server Error` | Erreur imprévue ou contrainte de base violée : message générique et code `ERREUR_SERVEUR`, détail seulement dans les logs ; rien n'est enregistré |
 
 ### Format des erreurs
 
@@ -157,7 +157,7 @@ Réponse `201`, en-tête `Location: /api/cours/{idCours}/pages/{idPage}` :
 | Emplacement hors du cours | `422` | `EMPLACEMENT_INVALIDE` | Emplacement invalide : rechargez l'éditeur. |
 | Quiz inexistant, archivé ou d'un autre cours | `404` | `QUIZ_INTROUVABLE` | Quiz introuvable. |
 | Quiz en cours de séance | `409` | `QUIZ_EN_SEANCE` | Ce quiz est en cours de séance : réessayez après sa clôture. |
-| Erreur de base de données (rien n'est créé) | `500` | — | Message générique |
+| Erreur de base de données (rien n'est créé) | `500` | `ERREUR_SERVEUR` | Message générique |
 
 **PDF d'une version (éditeur E3).** `GET /api/cours/{idCours}/versions/{idVersion}/fichier`, lu par PDF.js pour
 l'aperçu, les miniatures et le repère de texte de l'UC3. Enseignant propriétaire seulement ; l'accès des étudiants
