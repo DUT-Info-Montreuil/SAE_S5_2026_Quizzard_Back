@@ -48,7 +48,7 @@ Contrat entre le back-end Spring Boot et le front React : routes REST et canal t
 | `413 Payload Too Large` | Fichier de plus de 50 Mo |
 | `415 Unsupported Media Type` | Fichier qui n'est pas un PDF ou une image acceptée |
 | `422 Unprocessable Entity` | Données bien formées refusées par une règle métier |
-| `500 Internal Server Error` | Erreur imprévue (message générique, détail seulement dans les logs) |
+| `500 Internal Server Error` | Erreur imprévue ou contrainte de base violée : message générique et code `ERREUR_SERVEUR`, détail seulement dans les logs ; rien n'est enregistré |
 
 ### Format des erreurs
 
@@ -207,18 +207,92 @@ du cours : un quiz appartient au cours, pas à une version. `dateModification` e
 | `GET` | `/api/cours/{idCours}` | Ens. | M | **Fait (UC2), détail ci-dessus.** Cours et sa dernière version ; la liste de ses versions viendra avec l'UC6 |
 | `PATCH` | `/api/cours/{idCours}` | Ens. | M | Renommer ou archiver `{titre?, archive?}` |
 | `POST` | `/api/cours/{idCours}/versions` | Ens. | M | Nouvelle version du PDF (multipart) → `201` version + pages proposées (`valide = false`) |
-| `GET` | `/api/cours/{idCours}/versions/{idVersion}/fichier` | Ens. ou Étu. de la séance | M | Le PDF (`application/pdf`), jamais servi en accès direct |
-| `GET` | `/api/cours/{idCours}/versions/{idVersion}/pages` | Ens. | M | Pages insérées de la version, dans l'ordre |
-| `POST` | `/api/cours/{idCours}/versions/{idVersion}/pages` | Ens. | M | Insérer une page `{numeroPage, ordre, idQuestion | idClassement}` → `201` |
-| `PATCH` | `/api/pages/{idPage}` | Ens. | M | Déplacer une page `{numeroPage, ordre}` |
-| `DELETE` | `/api/pages/{idPage}` | Ens. | M | Retirer une page (la question n'est pas supprimée) → `204` |
+| `GET` | `/api/cours/{idCours}/versions/{idVersion}/fichier` | Ens. (Étu. de la séance plus tard) | M | **Fait (éditeur E3, enseignant seulement).** Le PDF (`application/pdf`), jamais servi en accès direct (voir ci-dessous) |
+| `GET` | `/api/cours/{idCours}/versions/{idVersion}/pages` | Ens. | M | **Fait (UC3, éditeur E3).** Pages insérées de la version, dans l'ordre (voir ci-dessous) |
+| `POST` | `/api/cours/{idCours}/pages-quiz` | Ens. | M | **Fait (UC3).** Insérer une page de quiz (voir ci-dessous) → `201` |
+| `POST` | `/api/cours/{idCours}/versions/{idVersion}/pages` | Ens. | M | Insérer une page de classement `{numeroPage, ordre, idClassement}` (UC11) → `201` |
+| `PATCH` | `/api/pages/{idPage}` | Ens. | M | **Fait (éditeur E3).** Déplacer une page `{numeroPage, ordre}` → `200` pages de la version à jour |
+| `DELETE` | `/api/pages/{idPage}` | Ens. | M | **Fait (règle de l'UC3 : confirmation côté front).** Retirer une page (la question n'est pas supprimée) → `204` |
 | `POST` | `/api/cours/{idCours}/versions/{idVersion}/pages/validation` | Ens. | M | Valider les positions proposées après réapplication (UC6) |
+
+**Insérer une page de quiz (UC3).** Route du dossier de conception. Enseignant connecté et propriétaire du cours,
+lu dans la session (jamais dans la requête) ; un cours d'un autre enseignant répond comme un cours inexistant.
+
+```json
+{ "idVersion": 7, "numeroPage": 4, "ordre": 0, "idQuiz": 3, "repereTexte": "…fin de la page 4" }
+```
+
+- `numeroPage` : page du PDF après laquelle la page s'insère (0 = avant la première, `nbPages` = après la
+  dernière) ; `ordre` : rang parmi les pages déjà insérées au même endroit (0 = juste après la page du PDF). Les
+  pages de rang supérieur ou égal au même endroit sont décalées de 1.
+- `idQuiz` absent : un nouveau quiz est créé (« Quiz n », non noté, 20 s, passage manuel, cours projeté seul).
+  Dans tous les cas une question vierge est ajoutée (QCM, énoncé vide, durée du quiz, 1000 points, décroissance,
+  sans points partiels).
+- `repereTexte` : 300 caractères au plus, espaces normalisés (sert à l'UC6).
+
+Réponse `201`, en-tête `Location: /api/cours/{idCours}/pages/{idPage}` :
+
+```json
+{
+  "idPage": 12, "idQuiz": 3, "titreQuiz": "Quiz 1", "quizCree": false, "idQuestion": 40,
+  "numeroPage": 4, "ordre": 0,
+  "pages": [ { "idPage": 9, "numeroPage": 2, "ordre": 0, "type": "QUIZ", "idQuestion": 31, "idQuiz": 3, "titreQuiz": "Quiz 1" },
+             { "idPage": 12, "numeroPage": 4, "ordre": 0, "type": "QUIZ", "idQuestion": 40, "idQuiz": 3, "titreQuiz": "Quiz 1" } ]
+}
+```
+
+| Cas (UC3) | Statut | `code` | `error` |
+|---|---|---|---|
+| Pas connecté | `401` | — | Vous devez être connecté. |
+| Corps incomplet, valeur négative, repère trop long | `400` | `REQUETE_INVALIDE` | Certaines valeurs sont invalides. (`champs`) |
+| Cours inexistant ou d'un autre enseignant | `404` | `COURS_INTROUVABLE` | Cours introuvable. |
+| Cours archivé | `409` | `COURS_ARCHIVE` | Ce cours est archivé : il n'est plus modifiable. |
+| Version qui n'est plus la dernière | `409` | `VERSION_PERIMEE` | Une nouvelle version du cours a été importée : rechargez l'éditeur. |
+| Emplacement hors du cours | `422` | `EMPLACEMENT_INVALIDE` | Emplacement invalide : rechargez l'éditeur. |
+| Quiz inexistant, archivé ou d'un autre cours | `404` | `QUIZ_INTROUVABLE` | Quiz introuvable. |
+| Quiz en cours de séance | `409` | `QUIZ_EN_SEANCE` | Ce quiz est en cours de séance : réessayez après sa clôture. |
+| Erreur de base de données (rien n'est créé) | `500` | `ERREUR_SERVEUR` | Message générique |
+
+**PDF d'une version (éditeur E3).** `GET /api/cours/{idCours}/versions/{idVersion}/fichier`, lu par PDF.js pour
+l'aperçu, les miniatures et le repère de texte de l'UC3. Enseignant propriétaire seulement ; l'accès des étudiants
+viendra avec l'affichage du cours en séance.
+
+- `200`, corps = le PDF, `Content-Type: application/pdf`, `Content-Disposition: inline`,
+  `X-Content-Type-Options: nosniff`, `Cache-Control: private`.
+- Requêtes `Range` prises en charge (`206 Partial Content`) : PDF.js lit le fichier par tranches.
+- `404` `COURS_INTROUVABLE` (cours inexistant ou d'un autre enseignant), `404` `VERSION_INTROUVABLE` (version d'un
+  autre cours), `404` `FICHIER_INTROUVABLE` (fichier supprimé par l'administrateur, UC20, ou absent du disque).
+- Le chemin enregistré en base est lu dans le dossier de stockage (`STOCKAGE_DOSSIER`) ; un chemin absolu ou avec
+  `../` n'est jamais lu.
+
+**Pages d'une version (éditeur E3).** Une page se décrit partout de la même façon (réponse du `POST`, du `GET` et du
+`PATCH`) : `{idPage, numeroPage, ordre, type, idQuestion, idQuiz, titreQuiz}`, `type` = `QUIZ` ou `CLASSEMENT`
+(`idQuestion`, `idQuiz` et `titreQuiz` nuls pour une page de classement). Lire ou paramétrer la question elle-même
+relève de l'UC4/UC5 (§3.3).
+
+- `GET /api/cours/{idCours}/versions/{idVersion}/pages` → `200` tableau dans l'ordre (page du PDF, puis rang). Toute
+  version du cours se lit. `404` `COURS_INTROUVABLE` (cours inexistant ou d'un autre enseignant),
+  `404` `VERSION_INTROUVABLE` (version d'un autre cours).
+- `DELETE /api/pages/{idPage}` → `204`. La question et le quiz sont conservés, même si le quiz n'a plus de page. Les
+  pages restées au même endroit sont renumérotées (rangs 0, 1, 2…). Action sensible journalisée. Le front demande
+  une confirmation avant l'appel.
+- `PATCH /api/pages/{idPage}` `{numeroPage, ordre}` → `200` pages de la version à jour. `ordre` est le rang parmi les
+  autres pages déjà à cet endroit (de 0 à leur nombre) ; l'ancien et le nouvel endroit sont renumérotés.
+
+| Cas (retirer, déplacer) | Statut | `code` |
+|---|---|---|
+| Page inexistante ou d'un cours d'un autre enseignant | `404` | `PAGE_INTROUVABLE` |
+| Cours archivé | `409` | `COURS_ARCHIVE` |
+| Page d'une version qui n'est plus la dernière | `409` | `VERSION_PERIMEE` |
+| Page d'un quiz en cours de séance (ses questions changeraient de position) | `409` | `QUIZ_EN_SEANCE` |
+| Emplacement hors du cours (`PATCH`) | `422` | `EMPLACEMENT_INVALIDE` |
+| Corps incomplet ou négatif (`PATCH`) | `400` | `REQUETE_INVALIDE` |
 
 ### 3.3 Quiz et questions (`quiz`) : UC4, UC5, UC13, UC14
 
 | Méthode | Route | Accès | Prio | Description |
 |---|---|---|---|---|
-| `GET` | `/api/cours/{idCours}/quiz` | Ens. | M | Quiz du cours |
+| `GET` | `/api/cours/{idCours}/quiz` | Ens. | M | **Fait (UC3, dialogue de choix de E3).** Quiz non archivés du cours, avec ou sans page : `[{idQuiz, titre}]`, par création ; `404` `COURS_INTROUVABLE` |
 | `POST` | `/api/cours/{idCours}/quiz` | Ens. | M | Créer un quiz `{titre, estNote, dureeParDefautSec, passageAutomatique, delaiPassageAutoSec, affichageCours}` → `201` |
 | `GET` | `/api/quiz/{idQuiz}` | Ens. | M | Quiz avec ses questions **et** les réponses attendues (vue éditeur E3) + indicateur « prêt à lancer » |
 | `PATCH` | `/api/quiz/{idQuiz}` | Ens. | M | Modifier le quiz (mode noté, durée, déroulé) ; `409` si une séance est en cours |
