@@ -195,13 +195,83 @@ Pour `POINTS_A_RELIER`, `propositions` est remplacé par `paires: [{gauche, droi
 
 | Méthode | Route | Accès | Prio | Description |
 |---|---|---|---|---|
-| `POST` | `/api/quiz/{idQuiz}/sessions` | Ens. | M | Lancer une séance `{idVersion}` → `201` `{idSession, codeAcces, lien}` ; `422` si une question est incomplète |
-| `GET` | `/api/sessions/{idSession}` | Ens. | M | État complet (E5) : question en cours, échéance, connectés, répartition |
-| `GET` | `/api/sessions/{idSession}/qrcode` | Ens. | M | QR code du lien (`image/png`), généré par le serveur |
-| `POST` | `/api/sessions/{idSession}/question-suivante` | Ens. | M | Ouvre la question suivante (ou passe à la page suivante) |
-| `POST` | `/api/sessions/{idSession}/cloture-question` | Ens. | M | Clôt la question en cours avant l'échéance |
-| `POST` | `/api/sessions/{idSession}/cloture` | Ens. | M | Clôt la séance ; le code d'accès devient invalide |
-| `POST` | `/api/sessions/{idSession}/identites-non-verifiees` | Ens. | S | Autorise l'entrée « identité non vérifiée » si le LDAP ne répond pas `{autorise}` |
+| `POST` | `/api/quiz/{idQuiz}/sessions` | Ens. | M | **Fait (UC7).** Lancer une séance (corps facultatif `{autoriserIdentiteNonVerifiee}`) → `201`, `Location: /api/sessions/{idSession}` |
+| `GET` | `/api/sessions/ouverte` | Ens. | M | **Fait (UC7).** La séance non terminée de l'enseignant, à reprendre ou à terminer ; `404` s'il n'y en a pas |
+| `GET` | `/api/sessions/{idSession}` | Ens. | M | **Fait (UC7).** État de la séance (E5) |
+| `POST` | `/api/sessions/{idSession}/questions/suivante` | Ens. | M | **Fait (UC7).** Ouvre la question suivante (la première après le lancement) ; après la dernière, termine la séance |
+| `POST` | `/api/sessions/{idSession}/questions/courante/cloture` | Ens. | M | **Fait (UC7).** Clôt la question en cours avant la fin du temps |
+| `POST` | `/api/sessions/{idSession}/cloture` | Ens. | M | **Fait (UC7).** Termine la séance ; le lien et le QR code ne valent plus rien |
+| `POST` | `/api/sessions/{idSession}/identites-non-verifiees` | Ens. | S | Autorise l'entrée « identité non vérifiée » si le LDAP ne répond pas `{autorise}` *(prévue, UC15)* |
+
+#### Lancer et dérouler une séance (UC7)
+
+Toutes ces routes répondent avec `Cache-Control: no-store` (le code d'accès est secret) et sont réservées à
+l'enseignant propriétaire. Les `POST` du déroulement n'ont pas de corps et renvoient l'état à jour (`200`).
+
+**Lancement.** `201` :
+
+```json
+{
+  "idSession": 7, "idQuiz": 3, "titre": "Quiz du chapitre 3", "statut": "PREPAREE", "modeNote": false,
+  "nbQuestions": 3, "codeAcces": "q7Vb0m3yR1c8Xk2LdT9aZw",
+  "lienAcces": "http://localhost:5173/rejoindre/q7Vb0m3yR1c8Xk2LdT9aZw",
+  "qrCode": "iVBORw0KGgo…", "dateLancement": "2026-11-25T14:00:00+01:00"
+}
+```
+
+- La séance présente la **dernière version** du cours. Ses questions sont les pages de quiz de ce quiz dans cette
+  version, triées par page du PDF puis par ordre ; `position` est leur rang (1 pour la première).
+- `lienAcces` = `<FRONT_URL>/rejoindre/<codeAcces>` ; `qrCode` est une image PNG en base64
+  (`data:image/png;base64,…`), produite par l'application. Il n'y a pas de route séparée pour le QR code.
+- Les questions lancées sont verrouillées (`question.verrouillee`). Une seule séance ouverte par enseignant.
+
+**État** (`GET` et réponses des `POST`). Les champs sans valeur sont absents :
+
+```json
+{
+  "idSession": 7, "idQuiz": 3, "titre": "Quiz du chapitre 3", "statut": "EN_COURS", "modeNote": false,
+  "nbQuestions": 3, "position": 1, "codeAcces": "…", "lienAcces": "…", "qrCode": "…",
+  "dateLancement": "2026-11-25T14:00:00+01:00", "connectes": 24, "questionOuverte": true,
+  "question": { "idQuestion": 12, "position": 1, "type": "QCM", "enonce": "…", "dureeSec": 20,
+    "echeance": "2026-11-25T14:01:20+01:00", "choixMultiple": false,
+    "propositions": [ { "idProposition": 41, "libelle": "LDAP" } ] },
+  "tempsRestantMs": 14200,
+  "repartition": { "idQuestion": 12, "total": 9, "propositions": [ { "idProposition": 41, "nombre": 9 } ] }
+}
+```
+
+- `question` a la forme de `GET /api/public/sessions/{codeAcces}/etat` (UC9) : sans aucune réponse attendue.
+- `correction` (même forme que le message `…/correction` ci-dessous) n'est présente qu'une fois la question close.
+- Séance terminée : `statut = CLOTUREE`, `dateCloture`, plus de `lienAcces` ni de `qrCode`.
+
+| Cas (UC7) | Statut | `code` | `error` |
+|---|---|---|---|
+| Pas connecté | `401` | — | Vous devez être connecté. |
+| Quiz inexistant ou archivé | `404` | — | Ce quiz n'existe pas ou a été supprimé. |
+| Quiz ou séance d'un autre enseignant, jeton CSRF absent | `403` | — | Action non autorisée. |
+| Quiz sans page de question, ou question incomplète (au lancement ou à son ouverture) | `422` | `QUIZ_INCOMPLET` | Le quiz contient une question incomplète (page 6). Complétez-la avant de lancer. |
+| Séance déjà ouverte | `409` | `SESSION_DEJA_OUVERTE` | Une session est déjà ouverte pour le cours « … ». La reprendre ou la terminer ? |
+| Quiz noté, annuaire indisponible, sans autorisation | `409` | `ANNUAIRE_INDISPONIBLE` | L'annuaire de l'IUT est indisponible. Autoriser l'entrée en identité non vérifiée ? |
+| QR code, code d'accès, base ou canal temps réel en panne (aucune séance créée) | `500` | — | Message générique ; le front affiche « Le lancement a échoué, réessayez. » |
+| Séance inexistante | `404` | `SEANCE_INTROUVABLE` | Cette séance n'existe pas ou a été supprimée. |
+| Séance terminée | `409` | `SEANCE_TERMINEE` | Cette séance est terminée. |
+| « Suivant » pendant une question ouverte | `409` | `QUESTION_DEJA_OUVERTE` | Une question est déjà ouverte. Clôturez-la avant de passer à la suivante. |
+| Clôture sans question ouverte | `409` | `AUCUNE_QUESTION_OUVERTE` | Aucune question n'est ouverte. |
+
+**Temps réel du déroulement.** Les envois partent une fois le changement enregistré.
+
+| Événement du dossier | Destination | Contenu |
+|---|---|---|
+| Ouverture, clôture, `session_terminee` | `…/etat` | `{etat, position, idQuestion, echeance}` ; `echeance` nulle quand la question est close ; `etat = CLOTUREE` à la fin |
+| `question_demarree` | `…/question` | La question, forme ci-dessus |
+| `question_close` | `…/correction` | `{idQuestion, position, type, bonnesPropositions, paires, reponsesAcceptees, total, repartition}` |
+| `question_close` | `/user/queue/resultat` | `{idQuestion, points, scoreTotal, rang, nombreParticipants, evolution, repondu, bonneReponse}` |
+| `ecran_intermediaire` | `…/ecran` | `{idQuestion, position, type, rang, delaiApresClotureSec}`, envoyé à l'heure de l'écran |
+
+`…` désigne `/topic/sessions/{codeAcces}`. Correction : `paires` = `[{gauche, droite, libelleGauche,
+libelleDroite}]` (identifiants de paires) ; `reponsesAcceptees` = motifs simples seulement ; `repartition` =
+`[{idProposition, nombre}]`. Une question se ferme **seule** à son échéance (horloge du serveur, 250 ms de marge) ;
+avec le passage automatique, la suivante s'ouvre après le dernier écran puis le délai réglé (5 s sans réglage).
 
 ### 3.5 Séances, côté étudiant (`seance`) : UC8, UC9, UC12, UC15
 

@@ -120,6 +120,28 @@ Règles :
    `delai_passage_auto_sec`.
 7. À la clôture de la séance, le code d'accès et les jetons de participants sont invalidés.
 
+### Lancer et dérouler une séance (UC7)
+
+- Lancement tout ou rien, dans une transaction : propriété du quiz, quiz prêt, aucune autre séance ouverte (la ligne
+  de l'enseignant est verrouillée), annuaire pour un quiz noté, séance, QR code, canal temps réel, puis action
+  sensible `quiz_lance`. Un refus n'est tracé que dans les logs.
+- La séance présente la dernière version du cours. Ses questions sont les pages de quiz de cette version, triées par
+  page du PDF puis par ordre ; `position_courante` est le rang de la page. L'UC9 retrouve la question ouverte de la
+  même façon : les deux lectures doivent rester d'accord.
+- « Prêt » : au moins une question, et pour chacune un énoncé, une durée et ses réponses attendues (§2). La question
+  est revérifiée à son ouverture.
+- Code d'accès : 16 octets tirés par `SecureRandom`, en Base64url (22 caractères). Il n'apparaît pas dans les logs
+  métier ni dans `journal_evenement`.
+- Une question est **ouverte** quand la séance est `EN_COURS` et qu'`echeance_question` est fixée ; la clore efface
+  l'échéance. La clôture automatique part à l'échéance plus 250 ms, et les échéances en cours sont reprogrammées au
+  redémarrage du serveur. Les écrans et le passage automatique en attente sont perdus à un redémarrage.
+- Quiz noté sans annuaire : l'autorisation de l'enseignant est gardée dans
+  `session_quiz.identite_non_verifiee_autorisee`.
+- Résultat envoyé à chaque étudiant à la clôture : points, score, rang (score, puis temps cumulé, puis arrivée) et
+  évolution. Le classement projeté relève de la feature `classement`.
+- Choix **à valider** : délai du passage automatique non réglé = 5 s ; terminer la séance pendant une question la
+  clôt et publie sa correction.
+
 ### Rejoindre une séance
 
 | Mode | Étapes | Règles |
