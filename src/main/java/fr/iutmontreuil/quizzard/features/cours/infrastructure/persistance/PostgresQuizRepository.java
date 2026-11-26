@@ -1,5 +1,6 @@
 package fr.iutmontreuil.quizzard.features.cours.infrastructure.persistance;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -8,6 +9,7 @@ import org.springframework.stereotype.Repository;
 import fr.iutmontreuil.quizzard.features.cours.application.port.QuizRepository;
 import fr.iutmontreuil.quizzard.features.cours.domain.Question;
 import fr.iutmontreuil.quizzard.features.cours.domain.Quiz;
+import fr.iutmontreuil.quizzard.features.cours.domain.QuizDuCours;
 
 /** Quiz et questions vierges, en SQL. */
 @Repository
@@ -33,6 +35,14 @@ class PostgresQuizRepository implements QuizRepository {
                         l.getBoolean("est_note"), l.getInt("duree_par_defaut_sec"), l.getBoolean("passage_automatique"),
                         l.getString("affichage_cours"), l.getBoolean("archive")))
                 .optional();
+    }
+
+    @Override
+    public List<QuizDuCours> listerActifs(Long idCours) {
+        return jdbc.sql("SELECT id_quiz, titre FROM quiz WHERE id_cours = :idCours AND NOT archive ORDER BY id_quiz")
+                .param("idCours", idCours)
+                .query((l, i) -> new QuizDuCours(l.getLong("id_quiz"), l.getString("titre")))
+                .list();
     }
 
     @Override

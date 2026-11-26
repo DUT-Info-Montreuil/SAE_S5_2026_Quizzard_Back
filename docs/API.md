@@ -198,7 +198,7 @@ relève de l'UC4/UC5 (§3.3).
 
 | Méthode | Route | Accès | Prio | Description |
 |---|---|---|---|---|
-| `GET` | `/api/cours/{idCours}/quiz` | Ens. | M | Quiz du cours |
+| `GET` | `/api/cours/{idCours}/quiz` | Ens. | M | **Fait (UC3, dialogue de choix de E3).** Quiz non archivés du cours, avec ou sans page : `[{idQuiz, titre}]`, par création ; `404` `COURS_INTROUVABLE` |
 | `POST` | `/api/cours/{idCours}/quiz` | Ens. | M | Créer un quiz `{titre, estNote, dureeParDefautSec, passageAutomatique, delaiPassageAutoSec, affichageCours}` → `201` |
 | `GET` | `/api/quiz/{idQuiz}` | Ens. | M | Quiz avec ses questions **et** les réponses attendues (vue éditeur E3) + indicateur « prêt à lancer » |
 | `PATCH` | `/api/quiz/{idQuiz}` | Ens. | M | Modifier le quiz (mode noté, durée, déroulé) ; `409` si une séance est en cours |

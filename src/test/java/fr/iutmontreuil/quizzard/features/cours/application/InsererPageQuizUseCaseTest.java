@@ -34,6 +34,7 @@ import fr.iutmontreuil.quizzard.features.cours.domain.PagePlacee;
 import fr.iutmontreuil.quizzard.features.cours.domain.PageQuiz;
 import fr.iutmontreuil.quizzard.features.cours.domain.Question;
 import fr.iutmontreuil.quizzard.features.cours.domain.Quiz;
+import fr.iutmontreuil.quizzard.features.cours.domain.QuizDuCours;
 import fr.iutmontreuil.quizzard.features.cours.domain.QuizEnSeanceException;
 import fr.iutmontreuil.quizzard.features.cours.domain.QuizIntrouvableException;
 import fr.iutmontreuil.quizzard.features.cours.domain.VersionCours;
@@ -172,6 +173,11 @@ class InsererPageQuizUseCaseTest {
         public Optional<Quiz> trouverActif(Long idQuiz, Long idCours) {
             return Optional.ofNullable(lesQuiz.get(idQuiz))
                     .filter(q -> q.idCours().equals(idCours) && !q.archive());
+        }
+
+        @Override
+        public List<QuizDuCours> listerActifs(Long idCours) {
+            throw new UnsupportedOperationException();
         }
 
         @Override

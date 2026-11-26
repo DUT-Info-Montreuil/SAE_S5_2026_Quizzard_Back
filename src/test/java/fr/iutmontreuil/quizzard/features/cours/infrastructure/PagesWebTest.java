@@ -94,6 +94,27 @@ class PagesWebTest {
                 .andExpect(jsonPath("$.code").value("VERSION_INTROUVABLE"));
     }
 
+    // ---- Quiz du cours ----
+
+    @Test
+    void les_quiz_du_cours_comprennent_ceux_sans_page_mais_pas_les_archives() throws Exception {
+        mvc.perform(get("/api/cours/2000/quiz"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(3))
+                .andExpect(jsonPath("$[0].idQuiz").value(2000))
+                .andExpect(jsonPath("$[0].titre").value("Quiz 1"))
+                .andExpect(jsonPath("$[1].idQuiz").value(2001))
+                .andExpect(jsonPath("$[2].idQuiz").value(2005))
+                .andExpect(jsonPath("$[2].titre").value("Quiz sans page"));
+    }
+
+    @Test
+    void les_quiz_d_un_cours_d_un_autre_enseignant_sont_introuvables() throws Exception {
+        mvc.perform(get("/api/cours/2002/quiz"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("COURS_INTROUVABLE"));
+    }
+
     // ---- Retirer ----
 
     @Test
